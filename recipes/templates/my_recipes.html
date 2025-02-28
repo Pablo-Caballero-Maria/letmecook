@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load recipe_filters %}
 {% block title %}My Recipes - Let Me Cook{% endblock %}
 {% block content %}
   {% if error %}
@@ -24,7 +25,12 @@
       {% for recipe in recipes %}
       <div class="border rounded-lg p-4">
         <div class="flex justify-between items-center">
-          <h2 class="text-xl font-semibold">{{ recipe.title }}</h2>
+          <div class="flex items-center">
+            {% if recipe.photo %}
+              <img src="{{ recipe.photo }}" alt="{{ recipe.title }}" class="w-16 h-16 object-cover rounded mr-3">
+            {% endif %}
+            <h2 class="text-xl font-semibold">{{ recipe.title }}</h2>
+          </div>
           <div class="space-x-2">
             <button class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300" onclick="toggleDetails('details-{{ recipe.id }}')">
               Details
@@ -32,32 +38,34 @@
             <button onclick="openModal('updateModal-{{ recipe.id }}')" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
               Update
             </button>
-              <button onclick="confirmDelete('/recipe/delete/{{ recipe.id }}')" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">
-                Delete
-              </button>
+            <button onclick="confirmDelete('/recipe/delete/{{ recipe.id }}')" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">
+              Delete
+            </button>
           </div>
         </div>
+
+
         <div id="details-{{ recipe.id }}" class="mt-4 hidden">
           <p class="mb-2"><strong>Description:</strong> {{ recipe.description }}</p>
           <p class="mb-2"><strong>Tags:</strong> {{ recipe.tags|join:", " }}</p>
-          <p class="mb-2">
-            <strong>Likes:</strong> {{ recipe.likes }} 
-            <strong>Dislikes:</strong> {{ recipe.dislikes }}
-          </p>
           <p class="mb-2"><strong>Duration:</strong> {{ recipe.duration }} minutes</p>
           <div>
             <strong>Ingredients:</strong>
             <ul class="list-disc ml-6">
               {% for ingredient in recipe.ingredients %}
-              <li>
-                {{ ingredient.name }} 
-                (Calories: {{ ingredient.calories }}, Fat: {{ ingredient.fat }}, Carbs: {{ ingredient.carbohydrates }}, Protein: {{ ingredient.protein }}) 
-                {% if ingredient.quantity %}
-                  &mdash; Quantity: {{ ingredient.quantity }}
+              <li class="flex items-center mb-2">
+                {% if ingredient.photo %}
+                  <img src="{{ ingredient.photo }}" alt="{{ ingredient.name }}" class="w-10 h-10 object-cover rounded mr-3 flex-shrink-0">
                 {% endif %}
-                <br>
-                <em>Allergens:</em> {{ ingredient.allergens|join:", " }}; 
-                <em>Tags:</em> {{ ingredient.tags|join:", " }}
+                <div>
+                  <strong>{{ ingredient.name }}</strong> 
+                  {% if ingredient.quantity %} &mdash; Quantity: {{ ingredient.quantity }}{% endif %}<br>
+                  Calories: {{ ingredient.calories }}, Fat: {{ ingredient.fat }}g,<br>
+                  Carbs: {{ ingredient.carbohydrates }}g, Protein: {{ ingredient.protein }}g<br>
+                  {% if ingredient.allergens %}
+                    <span class="text-red-600"><em>Allergens:</em> {{ ingredient.allergens|join:", " }}</span>
+                  {% endif %}
+                </div>
               </li>
               {% endfor %}
             </ul>
@@ -70,13 +78,60 @@
             <p>Carbohydrates: {{ recipe.total_carbohydrates }}</p>
             <p>Protein: {{ recipe.total_protein }}</p>
           </div>
-          <div class="mt-2">
+<!-- Interaction buttons -->
+<div class="flex flex-wrap gap-2 mt-4">
+  <!-- Like button -->
+  <button onclick="likeRecipe('{{ recipe.id }}')" 
+    id="like-btn-{{ recipe.id }}"
+    class="{% if current_user in recipe.liked_by %}bg-green-500 text-white{% else %}bg-green-100 text-green-800{% endif %} hover:bg-green-200 font-bold py-1 px-3 rounded">
+    👍 <span id="likes-count-{{ recipe.id }}">{{ recipe.likes }}</span>
+  </button>
+  
+  <!-- Dislike button -->
+  <button onclick="dislikeRecipe('{{ recipe.id }}')"
+    id="dislike-btn-{{ recipe.id }}"
+    class="{% if current_user in recipe.disliked_by %}bg-red-500 text-white{% else %}bg-red-100 text-red-800{% endif %} hover:bg-red-200 font-bold py-1 px-3 rounded">
+    👎 <span id="dislikes-count-{{ recipe.id }}">{{ recipe.dislikes }}</span>
+  </button>
+  
+  <!-- Save button -->
+  <button onclick="saveRecipe('{{ recipe.id }}')"
+    id="save-btn-{{ recipe.id }}"
+    class="{% if recipe in current_user.saved_recipes %}bg-blue-500 text-white{% else %}bg-blue-100 text-blue-800{% endif %} hover:bg-blue-200 font-bold py-1 px-3 rounded">
+    <span id="save-text-{{ recipe.id }}">
+      {% if recipe in current_user.saved_recipes %}
+        ⭐ Saved
+      {% else %}
+        ☆ Save
+      {% endif %}
+    </span>
+  </button>
+</div>
+          <div class="mt-4 p-2 rounded bg-gray-50">
             <strong>Comments:</strong>
-            <ul class="list-disc ml-6">
+            <ul class="list-disc ml-6 mt-2 comments-list">
               {% for comment in recipe.comments %}
-              <li>{{ comment }}</li>
+              <li class="flex items-start mb-1">
+                  <img src="{{ comment.author.profile_picture }}" alt="{{ comment.author.username }}" class="w-6 h-6 object-cover rounded-full mr-2 mt-0.5">
+
+                <div>
+                  <span class="font-medium">{{ comment.author.username }}:</span>
+                  <span>{{ comment.text }}</span>
+                </div>
+              </li>
+              {% empty %}
+              <li class="text-gray-500">No comments yet</li>
               {% endfor %}
             </ul>
+
+            <!-- Comment form -->
+            <form id="commentForm-{{ recipe.id }}" onsubmit="submitComment(event, '{{ recipe.id }}')" class="mt-2 flex space-x-2">
+              {% csrf_token %}
+              <input type="text" name="comment" placeholder="Add a comment..." class="flex-grow px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Comment
+              </button>
+            </form>
           </div>
         </div>
       </div>
@@ -87,13 +142,20 @@
           <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg relative max-h-[90vh] overflow-y-auto">
             <button onclick="closeModal('updateModal-{{ recipe.id }}')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
             <h2 class="text-2xl font-bold mb-4">Update Recipe</h2>
-            <form action="/recipe/update/{{ recipe.id }}" method="POST">
+            <form action="/recipe/update/{{ recipe.id }}" method="POST" enctype="multipart/form-data">              
               {% csrf_token %}
               <div class="mb-4">
                 <label class="block">Title</label>
                 <input name="title" type="text" value="{{ recipe.title }}" class="border rounded w-full p-2">
               </div>
               <div class="mb-4">
+                  <label class="block">Recipe Photo</label>
+                  <input type="file" name="photo" accept="image/*" class="border rounded w-full p-2 mb-2" onchange="previewImage(this, 'recipeImagePreview-{{ recipe.id }}')">
+                  <div id="recipeImagePreview-{{ recipe.id }}" class="mt-2" data-original="{{ recipe.photo }}">
+                    {% if recipe.photo %}
+                      <img src="{{ recipe.photo }}" alt="{{ recipe.title }}" class="h-20 w-auto object-cover rounded">
+                    {% endif %}
+                  </div>      
                 <label class="block">Description</label>
                 <textarea name="description" class="border rounded w-full p-2">{{ recipe.description }}</textarea>
               </div>
@@ -114,24 +176,28 @@
                   {% endfor %}
                 </select>
               </div>
-              <div class="mb-4">
-                <label class="block">Ingredients (choose and set quantity)</label>
-                <div id="ingredientsContainer-{{ recipe.id }}">
-                  {% for ingredient in recipe.ingredients %}
-                  <div class="flex items-center space-x-2 mb-2">
-                    <input type="text" name="ingredients" value="{{ ingredient.name }}" class="border rounded p-1" readonly>
-                    <input type="number" name="quantities" value="{{ ingredient.quantity|default:'1' }}" min="1" placeholder="Quantity" class="border rounded p-1 w-24">
-                    <button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>
-                  </div>
-                  {% endfor %}
-                </div>
-                <select onchange="addIngredient(this, 'ingredientsContainer-{{ recipe.id }}')" class="border rounded p-1">
-                  <option value="">Add ingredient</option>
-                  {% for ingredient in ingredients %}
-                  <option value="{{ ingredient.name }}||{{ ingredient.calories }}||{{ ingredient.fat }}||{{ ingredient.carbohydrates }}||{{ ingredient.protein }}||{{ ingredient.allergens|join:';' }}||{{ ingredient.tags|join:';' }}">{{ ingredient.name }}</option>
-                  {% endfor %}
-                </select>
-              </div>
+      <div class="mb-4">
+        <label class="block">Ingredients (choose and set quantity)</label>
+        <div id="ingredientsContainer-{{ recipe.id }}">
+          {% for ingredient in recipe.ingredients %}
+          <div class="flex items-center space-x-2 mb-2">
+            {% if ingredient.photo %}
+              <img src="{{ ingredient.photo }}" alt="{{ ingredient.name }}" class="w-10 h-10 object-cover rounded">
+            {% endif %}
+            <input type="text" name="ingredients" value="{{ ingredient.name }}" class="border rounded p-1" readonly>
+            <input type="hidden" name="ingredient_photos" value="{{ ingredient.photo|default:'' }}">
+            <input type="number" name="quantities" value="{{ ingredient.quantity|default:'1' }}" min="1" placeholder="Quantity" class="border rounded p-1 w-24">
+            <button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>
+          </div>
+          {% endfor %}
+        </div>
+        <select onchange="addIngredient(this, 'ingredientsContainer-{{ recipe.id }}')" class="border rounded p-1">
+          <option value="">Add ingredient</option>
+          {% for ingredient in ingredients %}
+          <option value="{{ ingredient.name }}||{{ ingredient.calories }}||{{ ingredient.fat }}||{{ ingredient.carbohydrates }}||{{ ingredient.protein }}||{{ ingredient.allergens|join:';' }}||{{ ingredient.photo|default:'' }}">{{ ingredient.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
               <div class="mb-4">
                 <label class="block">Duration (minutes)</label>
                 <input name="duration" type="number" value="{{ recipe.duration }}" min="1" class="border rounded w-full p-2">
@@ -153,11 +219,17 @@
       <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg relative max-h-[90vh] overflow-y-auto">
         <button onclick="closeModal('createModal')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
         <h2 class="text-2xl font-bold mb-4">Create New Recipe</h2>
-        <form action="/recipe/new" method="POST" onsubmit="return validateRecipeForm(this)">        {% csrf_token %}
+        <form action="/recipe/new" method="POST" enctype="multipart/form-data" onsubmit="return validateRecipeForm(this)">
+          {% csrf_token %}
           <div class="mb-4">
             <label class="block">Title</label>
             <input name="title" type="text" placeholder="Recipe title" class="border rounded w-full p-2">
             <span class="text-red-500 text-sm hidden error-message" id="title-error">Title is required</span>
+          </div>
+          <div class="mb-4">
+            <label class="block">Recipe Photo</label>
+            <input type="file" name="photo" accept="image/*" class="border rounded w-full p-2" onchange="previewImage(this, 'recipeImagePreview')">
+            <div id="recipeImagePreview" class="mt-2"></div>
           </div>
           <div class="mb-4">
             <label class="block">Description</label>
@@ -180,7 +252,7 @@
             <select onchange="addIngredient(this, 'newIngredientsContainer')" class="border rounded p-1">
               <option value="">Add ingredient</option>
               {% for ingredient in ingredients %}
-              <option value="{{ ingredient.name }}||{{ ingredient.calories }}||{{ ingredient.fat }}||{{ ingredient.carbohydrates }}||{{ ingredient.protein }}||{{ ingredient.allergens|join:';' }}||{{ ingredient.tags|join:';' }}">{{ ingredient.name }}</option>
+              <option value="{{ ingredient.name }}||{{ ingredient.calories }}||{{ ingredient.fat }}||{{ ingredient.carbohydrates }}||{{ ingredient.protein }}||{{ ingredient.allergens|join:';' }}||{{ ingredient.photo }}">{{ ingredient.name }}</option>
               {% endfor %}
             </select>
             <span class="text-red-500 text-sm hidden error-message" id="ingredients-error">At least one ingredient is required</span>
@@ -197,17 +269,280 @@
       </div>
     </div> 
   </div>
+  </div>
 
   <!-- JavaScript for modals and dynamic fields -->
   <script>
-    function openModal(id) {
-    document.getElementById(id).classList.remove('hidden');
-    document.body.style.overflow = 'hidden';  // Prevent scrolling
+    // Get CSRF token from cookies
+function getCsrfToken() {
+  const name = 'csrftoken';
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
+      }
     }
+  }
+  return cookieValue;
+}
+
+// Like a recipe
+function likeRecipe(recipeId) {
+  const csrfToken = getCsrfToken();
+  
+  fetch('/recipe/' + recipeId + '/like', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Update like count
+      document.getElementById('likes-count-' + recipeId).textContent = data.likes;
+      
+      // Update button styling
+      const likeBtn = document.getElementById('like-btn-' + recipeId);
+      const dislikeBtn = document.getElementById('dislike-btn-' + recipeId);
+      const dislikeCount = document.getElementById('dislikes-count-' + recipeId);
+      
+      if (data.liked) {
+        likeBtn.classList.replace('bg-green-100', 'bg-green-500');
+        likeBtn.classList.replace('text-green-800', 'text-white');
+      } else {
+        likeBtn.classList.replace('bg-green-500', 'bg-green-100');
+        likeBtn.classList.replace('text-white', 'text-green-800');
+      }
+      
+      // If disliking was removed as a result of liking
+      if (data.dislike_removed) {
+        dislikeBtn.classList.replace('bg-red-500', 'bg-red-100');
+        dislikeBtn.classList.replace('text-white', 'text-red-800');
+        dislikeCount.textContent = data.dislikes;
+      }
+    }
+  });
+}
+
+// Dislike a recipe
+function dislikeRecipe(recipeId) {
+  const csrfToken = getCsrfToken();
+  
+  fetch('/recipe/' + recipeId + '/dislike', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Update dislike count
+      document.getElementById('dislikes-count-' + recipeId).textContent = data.dislikes;
+      
+      // Update button styling
+      const dislikeBtn = document.getElementById('dislike-btn-' + recipeId);
+      const likeBtn = document.getElementById('like-btn-' + recipeId);
+      const likeCount = document.getElementById('likes-count-' + recipeId);
+      
+      if (data.disliked) {
+        dislikeBtn.classList.replace('bg-red-100', 'bg-red-500');
+        dislikeBtn.classList.replace('text-red-800', 'text-white');
+      } else {
+        dislikeBtn.classList.replace('bg-red-500', 'bg-red-100');
+        dislikeBtn.classList.replace('text-white', 'text-red-800');
+      }
+      
+      // If liking was removed as a result of disliking
+      if (data.like_removed) {
+        likeBtn.classList.replace('bg-green-500', 'bg-green-100');
+        likeBtn.classList.replace('text-white', 'text-green-800');
+        likeCount.textContent = data.likes;
+      }
+    }
+  });
+}
+
+// Save a recipe
+function saveRecipe(recipeId) {
+  const csrfToken = getCsrfToken();
+  
+  fetch('/recipe/' + recipeId + '/save', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Update button styling
+      const saveBtn = document.getElementById('save-btn-' + recipeId);
+      const saveText = document.getElementById('save-text-' + recipeId);
+      
+      if (data.saved) {
+        saveBtn.classList.replace('bg-blue-100', 'bg-blue-500');
+        saveBtn.classList.replace('text-blue-800', 'text-white');
+        saveText.innerHTML = '⭐ Saved';
+      } else {
+        saveBtn.classList.replace('bg-blue-500', 'bg-blue-100');
+        saveBtn.classList.replace('text-white', 'text-blue-800');
+        saveText.innerHTML = '☆ Save';
+      }
+    }
+  });
+}
+function submitComment(event, recipeId) {
+  event.preventDefault();
+  
+  const form = document.getElementById('commentForm-' + recipeId);
+  const commentInput = form.querySelector('input[name="comment"]');
+  const comment = commentInput.value.trim();
+  
+  if (!comment) return;
+  
+  // Get CSRF token
+  const csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
+  
+  // Create a request
+  fetch('/recipe/' + recipeId + '/comment', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRFToken': csrfToken,
+      'Accept': 'application/json'
+    },
+    body: 'comment=' + encodeURIComponent(comment)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Find the comments container
+      const detailsContainer = document.getElementById('details-' + recipeId);
+      
+      // Find the comments list
+      const commentsList = detailsContainer.querySelector('ul.comments-list');      
+      // Remove "No comments yet" message if it exists
+      const noCommentsMsg = commentsList.querySelector('li.text-gray-500');
+      if (noCommentsMsg) {
+        noCommentsMsg.remove();
+      }
+      
+      // Add the new comment
+      const li = document.createElement('li');
+      li.className = 'flex items-start mb-1';
+      
+      // Create profile picture element
+      if (data.user_profile_picture) {
+        const img = document.createElement('img');
+        img.src = data.user_profile_picture;
+        img.alt = data.username;
+        img.className = 'w-6 h-6 object-cover rounded-full mr-2 mt-0.5';
+        li.appendChild(img);
+      } else {
+        const avatarDiv = document.createElement('div');
+        avatarDiv.className = 'w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center mr-2 mt-0.5 text-xs';
+        avatarDiv.textContent = data.username.charAt(0).toUpperCase();
+        li.appendChild(avatarDiv);
+      }
+      
+      // Add comment text with username
+      const commentDiv = document.createElement('div');
+      
+      const usernameSpan = document.createElement('span');
+      usernameSpan.className = 'font-medium';
+      usernameSpan.textContent = data.username + ': ';
+      commentDiv.appendChild(usernameSpan);
+      
+      const textSpan = document.createElement('span');
+      textSpan.textContent = data.comment_text;
+      commentDiv.appendChild(textSpan);
+      
+      li.appendChild(commentDiv);
+      commentsList.appendChild(li);
+      
+      // Clear the input
+      commentInput.value = '';
+    } else {
+      if (data.error === 'login_required') {
+        window.location.href = '/login';
+      } else {
+        alert('Error: ' + (data.error || 'Something went wrong'));
+      }
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+}
+
+    function debugFormData() {
+      const forms = document.querySelectorAll('form[action^="/recipe/update/"]');
+      forms.forEach(form => {
+        form.addEventListener('submit', function() {
+          console.log("Form submission data:");
+          
+          // Log all ingredients and their photos
+          const ingredients = form.querySelectorAll('input[name="ingredients"]');
+          const photos = form.querySelectorAll('input[name="ingredient_photos"]');
+          const quantities = form.querySelectorAll('input[name="quantities"]');
+          
+          console.log(`Found ${ingredients.length} ingredients`);
+          for (let i = 0; i < ingredients.length; i++) {
+            console.log(`Ingredient: ${ingredients[i].value}, Photo: ${photos[i].value}, Quantity: ${quantities[i].value}`);
+          }
+        });
+      });
+    }
+    
+    document.addEventListener('DOMContentLoaded', debugFormData);
 
     function closeModal(id) {
       document.getElementById(id).classList.add('hidden');
       document.body.style.overflow = '';  // Restore scrolling
+      
+      // Reset form if this is a recipe modal
+      const form = document.getElementById(id).querySelector('form');
+      if (form) {
+        form.reset();
+        
+        // Clear dynamically added tags and ingredients
+        if (id === 'createModal') {
+          document.getElementById('newTagsContainer').innerHTML = '';
+          document.getElementById('newIngredientsContainer').innerHTML = '';
+          // Clear image preview
+          const imagePreview = document.getElementById('recipeImagePreview');
+          if (imagePreview) imagePreview.innerHTML = '';
+        }
+      }
+    }
+
+    function openModal(id) {
+      document.getElementById(id).classList.remove('hidden');
+      document.body.style.overflow = 'hidden';  // Prevent scrolling
+      
+      // Restore original images if this is an update modal
+      if (id.startsWith('updateModal-')) {
+        const recipeId = id.replace('updateModal-', '');
+        const imagePreview = document.getElementById('recipeImagePreview-' + recipeId);
+        if (imagePreview) {
+          const originalImg = imagePreview.getAttribute('data-original');
+          if (originalImg) {
+            imagePreview.innerHTML = `<img src="${originalImg}" alt="Recipe Image" class="h-20 w-auto object-cover rounded">`;
+          }
+        }
+      }
     }
 
     function confirmDelete(deleteUrl) {
@@ -223,7 +558,7 @@
       var container = el.closest('form');
       
       // If this is a tag
-      if (el.previousElementSibling.name === "tags") {
+      if (el.previousElementSibling && el.previousElementSibling.name === "tags") {
         var tagValue = el.previousElementSibling.value;
         var tagSelect = container.querySelector('select[onchange*="addTag"]');
         var option = document.createElement('option');
@@ -231,17 +566,27 @@
         option.text = tagValue;
         tagSelect.add(option);
       } 
-
       // If this is an ingredient
-      else if (el.previousElementSibling.name === "quantities") {
-        var ingredientName = el.previousElementSibling.previousElementSibling.value;
+      else if (el.previousElementSibling && el.previousElementSibling.name === "quantities") {
+        var ingredientName = el.previousElementSibling.previousElementSibling.previousElementSibling.value;
+        var ingredientPhoto = el.previousElementSibling.previousElementSibling.value;
         var ingredientSelect = container.querySelector('select[onchange*="addIngredient"]');
-        if (value) {
-          var option = document.createElement('option');
-          option.value = value;
-          option.text = ingredientName;
-          ingredientSelect.add(option);
+        
+        // Try to find a value to restore to the dropdown
+        var existingOptions = Array.from(ingredientSelect.options);
+        for (var i = 0; i < existingOptions.length; i++) {
+          if (existingOptions[i].text === ingredientName) {
+            // Already exists, don't add again
+            el.parentElement.remove();
+            return;
+          }
         }
+        
+        // Add back to dropdown if not found
+        var option = document.createElement('option');
+        option.value = ingredientName + "||||||||" + ingredientPhoto; // Simplified value
+        option.text = ingredientName;
+        ingredientSelect.add(option);
       }
       
       el.parentElement.remove();
@@ -269,19 +614,38 @@
     function addIngredient(select, containerId) {
       var value = select.value;
       if (value) {
-        // Expect value in format: name||calories||fat||carbs||protein||allergens||tags
+        // Expect value in format: name||calories||fat||carbs||protein||allergens||photo
         var parts = value.split("||");
         var name = parts[0];
+        var calories = parts[1];
+        var fat = parts[2];
+        var carbs = parts[3];
+        var protein = parts[4];
+        var allergens = parts[5] || '';
+        var photo = parts[6] || '';
+        
+        console.log("Adding ingredient with photo:", photo);
+        
         var container = document.getElementById(containerId);
         var div = document.createElement('div');
         div.className = "flex items-center space-x-2 mb-2";
-        div.innerHTML = '<input type="text" name="ingredients" value="'+name+'" class="border rounded p-1" readonly>' +
-                        '<input type="number" name="quantities" value="1" min="1" placeholder="Quantity" class="border rounded p-1 w-24">'
-                        '<button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>';
+        
+        // Create HTML with photo if available
+        let html = '';
+        if (photo && photo !== 'null' && photo !== 'undefined' && photo !== '') {
+          html += `<img src="${photo}" alt="${name}" class="w-10 h-10 object-cover rounded">`;
+        }
+        
+        html += `<input type="text" name="ingredients" value="${name}" class="border rounded p-1" readonly>` +
+                `<input type="hidden" name="ingredient_photos" value="${photo}">` +
+                `<input type="number" name="quantities" value="1" min="1" placeholder="Quantity" class="border rounded p-1 w-24">` +
+                `<button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>`;
+        
+        div.innerHTML = html;
         container.appendChild(div);
 
-        // Remove the option from the dropwdown
-        var option = select.querySelector('option[value="'+value+'"]');
+        // Remove option from dropdown
+        var option = select.querySelector(`option[value="${value}"]`);
         if (option) option.remove();
 
         select.selectedIndex = 0;
@@ -289,6 +653,8 @@
     }
 
   function validateRecipeForm(formElement) {
+    console.log("Validating form");
+    console.log(formElement);
     let isValid = true;
     
     // Title validation
@@ -313,7 +679,8 @@
     }
 
     // Ingredients validation
-    const ingredients = formElement.querySelectorAll('input[name="ingredients"]');
+    const ingredientsContainer = formElement.querySelector('#newIngredientsContainer');
+    const ingredients = ingredientsContainer.querySelectorAll('input[name="ingredients"]');
     const ingredientsError = formElement.querySelector('#ingredients-error');
     
     if (ingredients.length === 0) {
@@ -334,8 +701,33 @@
     }
 
     return isValid;
-}
+  }
 
+  function previewImage(input, previewId) {
+    const preview = document.getElementById(previewId);
+    preview.innerHTML = '';
+    
+    if (input.files && input.files[0]) {
+      const reader = new FileReader();
+      
+      reader.onload = function(e) {
+        const img = document.createElement('img');
+        img.src = e.target.result;
+        img.alt = 'Image Preview';
+        img.className = 'h-20 w-auto object-cover rounded';
+        preview.appendChild(img);
+      }
+      
+      reader.readAsDataURL(input.files[0]);
+    }
+    else {
+    // If no new file is selected, restore the original image if available
+    const originalImg = preview.getAttribute('data-original');
+    if (originalImg) {
+      preview.innerHTML = `<img src="${originalImg}" alt="Original Image" class="h-20 w-auto object-cover rounded">`;
+    }
+  }
+  }
   </script>
   
   <!-- Delete Confirmation Modal -->
@@ -358,5 +750,31 @@
       </div>
     </div>
   </div>
+</div>
+<!-- Pagination -->
+<div class="mt-8 flex justify-center">
+  {% if total_pages > 1 %}
+    <div class="flex space-x-2">
+      {% if current_page > 1 %}
+        <a href="?page={{ current_page|add:'-1' }}" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+          Previous
+        </a>
+      {% endif %}
+      
+      {% for i in total_pages|add:'1'|get_range %}
+        {% if i > 0 %}
+          <a href="?page={{ i }}" class="px-4 py-2 {% if i == current_page %}bg-blue-500 text-white{% else %}bg-gray-200{% endif %} rounded hover:bg-gray-300">
+            {{ i }}
+          </a>
+        {% endif %}
+      {% endfor %}
+      
+      {% if current_page < total_pages %}
+        <a href="?page={{ current_page|add:'1' }}" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+          Next
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
 </div>
 {% endblock %}

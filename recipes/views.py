@@ -3,18 +3,36 @@ from mongoengine.errors import DoesNotExist
 from auth_app.models import User
 from .models import Recipe, Ingredient, GlobalIngredient
 from django.http import JsonResponse
+import os
+from django.conf import settings
 
 def my_recipes_view(request):
     user_id = request.session.get('user_id')
     if not user_id:
         return redirect("login")
-    recipes = Recipe.objects(owner=user_id)
+    
+    # Add pagination
+    page = int(request.GET.get('page', 1))
+    per_page = 1  # Same as explore_recipes_view for consistency
+    
+    # Get all recipes for the user
+    all_recipes = Recipe.objects(owner=user_id)
     available_ingredients = GlobalIngredient.objects.all()
-    available_tags = sorted({ tag for ing in available_ingredients for tag in ing.tags })
+    
+    # Get unique tags from all recipes
+    all_recipe_objects = Recipe.objects.all()
+    available_tags = sorted(set(tag for recipe in all_recipe_objects for tag in recipe.tags if recipe.tags))
+    
+    # Paginate the recipes
+    total = all_recipes.count()
+    recipes = all_recipes.skip((page-1)*per_page).limit(per_page)
+    
     return render(request, 'my_recipes.html', {
         'recipes': recipes,
         'ingredients': available_ingredients,
-        'tags': available_tags
+        'tags': available_tags,
+        'current_page': page,
+        'total_pages': (total + per_page - 1) // per_page
     })
 
 def create_recipe_view(request):
@@ -28,16 +46,17 @@ def create_recipe_view(request):
         request.session.flush()
         return redirect("login")
         
-    available_ingredients = GlobalIngredient.objects.all()
-    available_tags = sorted({ tag for ing in available_ingredients for tag in ing.tags })
-
     if request.method == "POST":
+        print("POST data:", request.POST)
+        print("FILES data:", request.FILES)
+
         title = request.POST.get("title")
         description = request.POST.get("description")
         tags = request.POST.getlist("tags")
         ingredients = request.POST.getlist("ingredients")
         quantities = request.POST.getlist("quantities")
         duration = request.POST.get("duration")
+        photo = request.FILES.get("photo")
         
         recipe = Recipe(
             title=title,
@@ -46,6 +65,22 @@ def create_recipe_view(request):
             duration=int(duration) if duration else None,
             owner=user,
         )
+        
+        if photo:
+            upload_dir = os.path.join(settings.MEDIA_ROOT, 'recipe_photos')
+            os.makedirs(upload_dir, exist_ok=True)
+            
+            # Generate unique filename
+            filename = f"{user_id}_{photo.name}"
+            filepath = os.path.join(upload_dir, filename)
+            
+            with open(filepath, "wb+") as destination:
+                for chunk in photo.chunks():
+                    destination.write(chunk)
+            
+            # Store the URL
+            recipe.photo = f"/media/recipe_photos/{filename}"        
+        recipe.save()
         
         # Process ingredients with quantities and nutritional info
         if ingredients:
@@ -62,16 +97,15 @@ def create_recipe_view(request):
                         carbohydrates=global_ing.carbohydrates,
                         protein=global_ing.protein,
                         allergens=global_ing.allergens,
-                        tags=global_ing.tags,
-                        quantity=quantity
+                        quantity=quantity,
+                        photo = global_ing.photo
                     )
                     recipe_ingredients.append(ingredient)
                 except DoesNotExist:
                     pass
             
             recipe.ingredients = recipe_ingredients
-        
-        recipe.save()
+            recipe.save()
         return redirect("my_recipes")
     
     return redirect("my_recipes")
@@ -86,8 +120,6 @@ def recipe_update_view(request, recipe_id):
         return redirect("my_recipes")
     
     from .models import GlobalIngredient, Ingredient
-    available_ingredients = GlobalIngredient.objects.all()
-    available_tags = sorted({ tag for ing in available_ingredients for tag in ing.tags })
     
     if request.method == "POST":
         title = request.POST.get("title")
@@ -98,7 +130,8 @@ def recipe_update_view(request, recipe_id):
         likes = request.POST.get("likes")
         dislikes = request.POST.get("dislikes")
         duration = request.POST.get("duration")
-        
+        photo = request.FILES.get("photo")
+
         recipe.title = title
         recipe.description = description
         recipe.tags = tags
@@ -106,6 +139,13 @@ def recipe_update_view(request, recipe_id):
         recipe.dislikes = int(dislikes) if dislikes else recipe.dislikes
         recipe.duration = int(duration) if duration else recipe.duration
         
+        if photo:
+            photo_path = f"recipe_photos/{photo.name}"
+            with open(f"static/{photo_path}", "wb+") as destination:
+                for chunk in photo.chunks():
+                    destination.write(chunk)
+            recipe.photo = f"/static/{photo_path}"
+
         # Update ingredients with quantities and nutritional info
         if ingredients:
             recipe_ingredients = []
@@ -121,8 +161,8 @@ def recipe_update_view(request, recipe_id):
                         carbohydrates=global_ing.carbohydrates,
                         protein=global_ing.protein,
                         allergens=global_ing.allergens,
-                        tags=global_ing.tags,
-                        quantity=quantity
+                        quantity=quantity,
+                        photo = global_ing.photo
                     )
                     recipe_ingredients.append(ingredient)
                 except DoesNotExist:
@@ -173,23 +213,32 @@ def add_comment_view(request, recipe_id):
         if not user_id:
             return JsonResponse({'success': False, 'error': 'login_required'})
         
-        comment = request.POST.get('comment')
-        if not comment:
+        comment_text = request.POST.get('comment')
+        if not comment_text:
             return JsonResponse({'success': False, 'error': 'empty_comment'})
         
         try:
             recipe = Recipe.objects.get(id=recipe_id)
+            user = User.objects.get(id=user_id)
+            
+            # Create a new Comment object
+            from .models import Comment
+            comment = Comment(
+                text=comment_text,
+                author=user
+            )
+            
+            # Add to comments list
             if not recipe.comments:
                 recipe.comments = []
-                
-            user = User.objects.get(id=user_id)
-            comment_text = f"{user.username}: {comment}"
-            recipe.comments.append(comment_text)
+            recipe.comments.append(comment)
             recipe.save()
             
             return JsonResponse({
                 'success': True,
-                'comment': comment_text
+                'username': user.username,
+                'user_profile_picture': user.profile_picture,
+                'comment_text': comment_text
             })
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)})
@@ -198,13 +247,23 @@ def add_comment_view(request, recipe_id):
 
 def explore_recipes_view(request):
     user_id = request.session.get('user_id')
-    user = User.objects.get(id=user_id)
-        
-    # Get recipes from other users, newest first, limit to 20
-    recipes = Recipe.objects(owner__ne=user.id).order_by('-id').limit(20)
+    page = int(request.GET.get('page', 1))
+    per_page = 1
+    
+    if user_id:
+        user = User.objects.get(id=user_id)
+        all_recipes = Recipe.objects(owner__ne=user.id).order_by('-id')
+    else:
+        all_recipes = Recipe.objects.order_by('-id')
+    
+    # Calculate pagination
+    total = all_recipes.count()
+    recipes = all_recipes.skip((page-1)*per_page).limit(per_page)
     
     return render(request, 'explore_recipes.html', {
-        'recipes': recipes
+        'recipes': recipes,
+        'current_page': page,
+        'total_pages': (total + per_page - 1) // per_page
     })
 
 def search_view(request):
@@ -355,8 +414,137 @@ def saved_recipes_view(request):
     user_id = request.session.get('user_id')
     if not user_id:
         return redirect("login")
-        
+    
+    # Add pagination
+    page = int(request.GET.get('page', 1))
+    per_page = 1  # Same as explore_recipes_view for consistency
+    
     user = User.objects.get(id=user_id)
+    
+    # Get total count of saved recipes
+    total = len(user.saved_recipes) if user.saved_recipes else 0
+    
+    # Paginate saved recipes - need to handle differently since it's a list property
+    start_idx = (page-1)*per_page
+    end_idx = start_idx + per_page
+    paged_recipes = user.saved_recipes[start_idx:end_idx] if user.saved_recipes else []
+    
     return render(request, 'saved_recipes.html', {
-        'recipes': user.saved_recipes
+        'recipes': paged_recipes,
+        'current_page': page,
+        'total_pages': (total + per_page - 1) // per_page
+    })
+
+def get_all_tags(request):
+    """API endpoint to get all available tags"""
+    from .models import Recipe
+    # Get unique tags used in recipes
+    all_recipes = Recipe.objects.all()
+    available_tags = sorted(set(tag for recipe in all_recipes for tag in recipe.tags if recipe.tags))
+    
+    return JsonResponse({
+        'tags': available_tags
+    })
+
+def api_recipes_view(request):
+    """API endpoint for recipes with filtering and sorting"""
+    user_id = request.session.get('user_id')
+    current_user = None
+    if user_id:
+        current_user = User.objects.get(id=user_id)
+        
+    # Get query parameters
+    query = request.GET.get('q', '')
+    tags = request.GET.get('tags', '')
+    sort_by = request.GET.get('sort', 'newest')
+    page = int(request.GET.get('page', 1))
+    per_page = 1
+    
+    # Build the query
+    filters = {}
+    if user_id:
+        filters['owner__ne'] = user_id
+    
+    # Add text search if query provided
+    if query:
+        filters['__raw__'] = {
+            '$or': [
+                {'title': {'$regex': query, '$options': 'i'}},
+                {'description': {'$regex': query, '$options': 'i'}},
+                {'tags': {'$regex': query, '$options': 'i'}},
+                {'ingredients.name': {'$regex': query, '$options': 'i'}}
+            ]
+        }
+    
+    # Add tag filtering if tags provided
+    if tags:
+        tag_list = tags.split(',')
+        if tag_list:
+            if '__raw__' not in filters:
+                filters['__raw__'] = {}
+            filters['__raw__']['tags'] = {'$all': tag_list}
+    
+    # Query the database
+    recipes_query = Recipe.objects(**filters)
+    
+    # Sort the results
+    if sort_by == 'likes':
+        recipes_query = recipes_query.order_by('-likes')
+    elif sort_by == 'duration-asc':
+        recipes_query = recipes_query.order_by('duration')
+    elif sort_by == 'duration-desc':
+        recipes_query = recipes_query.order_by('-duration')
+    else:  # newest by default
+        recipes_query = recipes_query.order_by('-id')
+    
+    # Calculate pagination
+    total = recipes_query.count()
+    recipes = recipes_query.skip((page-1)*per_page).limit(per_page)
+    
+    # Format response
+    result = []
+    for recipe in recipes:
+        recipe_data = {
+            'id': str(recipe.id),
+            'title': recipe.title,
+            'description': recipe.description,
+            'tags': recipe.tags,
+            'likes': recipe.likes,
+            'dislikes': recipe.dislikes,
+            'duration': recipe.duration,
+            'owner_username': recipe.owner.username if recipe.owner else 'Unknown',
+            'owner_profile_picture': recipe.owner.profile_picture,
+            'comments': [{
+                'text': comment.text,
+                'author_username': comment.author.username,
+                'author_profile_picture': comment.author.profile_picture
+            } for comment in recipe.comments],
+            'user_liked': False,
+            'user_disliked': False,
+            'user_saved': False,
+            'photo': recipe.photo,  # Include photo URL
+            'ingredients': [{
+                'name': ing.name,
+                'calories': ing.calories,
+                'fat': ing.fat,
+                'carbohydrates': ing.carbohydrates,
+                'protein': ing.protein,
+                'quantity': ing.quantity,
+                'photo': ing.photo
+            } for ing in recipe.ingredients]
+        }
+        
+        # Add user-specific data if logged in
+        if current_user:
+            recipe_data['user_liked'] = current_user in recipe.liked_by if hasattr(recipe, 'liked_by') else False
+            recipe_data['user_disliked'] = current_user in recipe.disliked_by if hasattr(recipe, 'disliked_by') else False
+            recipe_data['user_saved'] = recipe in current_user.saved_recipes if hasattr(current_user, 'saved_recipes') else False
+        
+        result.append(recipe_data)
+    
+    return JsonResponse({
+        'recipes': result,
+        'total': total,
+        'current_page': page,
+        'total_pages': (total + per_page - 1) // per_page
     })

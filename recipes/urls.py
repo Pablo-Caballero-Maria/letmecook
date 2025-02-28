@@ -14,5 +14,6 @@ urlpatterns = [
     path('recipe/<recipe_id>/dislike', views.dislike_recipe_view, name='dislike_recipe'),
     path('recipe/<recipe_id>/save', views.save_recipe_view, name='save_recipe'),
     path('saved-recipes', views.saved_recipes_view, name='saved_recipes'),
-    
+    path('api/tags', views.get_all_tags, name='api_tags'),
+    path('api/recipes', views.api_recipes_view, name='api_recipes'),
 ]

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load recipe_filters %}
 {% block title %}Saved Recipes - Let Me Cook{% endblock %}
 {% block content %}
   <div class="max-w-7xl mx-auto py-8 px-4">
@@ -25,9 +26,12 @@
       {% for recipe in recipes %}
       <div class="border rounded-lg p-4">
         <div class="flex justify-between items-center">
-          <div>
+          <div class="flex items-center">
+            <img src="{{ recipe.photo }}" alt="{{ recipe.title }}" class="w-16 h-16 object-cover rounded mr-3">
+            <div>
             <h2 class="text-xl font-semibold">{{ recipe.title }}</h2>
             <p class="text-sm text-gray-500">By: {{ recipe.owner.username }}</p>
+            </div>
           </div>
           <div>
             <button class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300" onclick="toggleDetails('details-{{ recipe.id }}')">
@@ -38,21 +42,24 @@
         <div id="details-{{ recipe.id }}" class="mt-4 hidden">
           <p class="mb-2"><strong>Description:</strong> {{ recipe.description }}</p>
           <p class="mb-2"><strong>Tags:</strong> {{ recipe.tags|join:", " }}</p>
-          <p class="mb-2">
-            <strong>Likes:</strong> {{ recipe.likes }} 
-            <strong>Dislikes:</strong> {{ recipe.dislikes }}
-          </p>
           <p class="mb-2"><strong>Duration:</strong> {{ recipe.duration }} minutes</p>
           <div>
             <strong>Ingredients:</strong>
             <ul class="list-disc ml-6">
               {% for ingredient in recipe.ingredients %}
-              <li>
-                {{ ingredient.name }}
-                (Calories: {{ ingredient.calories }}, Fat: {{ ingredient.fat }}, Carbs: {{ ingredient.carbohydrates }}, Protein: {{ ingredient.protein }})
-                {% if ingredient.quantity %}
-                  &mdash; Quantity: {{ ingredient.quantity }}
+              <li class="flex items-center mb-2">
+                {% if ingredient.photo %}
+                  <img src="{{ ingredient.photo }}" alt="{{ ingredient.name }}" class="w-10 h-10 object-cover rounded mr-3 flex-shrink-0">
                 {% endif %}
+                <div>
+                  <strong>{{ ingredient.name }}</strong> 
+                  {% if ingredient.quantity %} &mdash; Quantity: {{ ingredient.quantity }}{% endif %}<br>
+                  Calories: {{ ingredient.calories }}, Fat: {{ ingredient.fat }}g,<br>
+                  Carbs: {{ ingredient.carbohydrates }}g, Protein: {{ ingredient.protein }}g<br>
+                  {% if ingredient.allergens %}
+                    <span class="text-red-600"><em>Allergens:</em> {{ ingredient.allergens|join:", " }}</span>
+                  {% endif %}
+                </div>
               </li>
               {% endfor %}
             </ul>
@@ -94,14 +101,20 @@
             <strong>Comments:</strong>
             <ul class="list-disc ml-6 mt-2">
               {% for comment in recipe.comments %}
-              <li>{{ comment }}</li>
+              <li class="flex items-start mb-1">
+                  <img src="{{ comment.author.profile_picture }}" alt="{{ comment.author.username }}" class="w-6 h-6 object-cover rounded-full mr-2 mt-0.5">
+                
+                <div>
+                  <span class="font-medium">{{ comment.author.username }}:</span>
+                  <span>{{ comment.text }}</span>
+                </div>
+              </li>
               {% empty %}
               <li class="text-gray-500">No comments yet</li>
               {% endfor %}
             </ul>
 
             <!-- Comment form -->
-            {% if current_user %}
             <form id="commentForm-{{ recipe.id }}" onsubmit="submitComment(event, '{{ recipe.id }}')" class="mt-2 flex space-x-2">
               {% csrf_token %}
               <input type="text" name="comment" placeholder="Add a comment..." class="flex-grow px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -109,11 +122,7 @@
                 Comment
               </button>
             </form>
-            {% else %}
-            <p class="mt-2 text-sm text-gray-500">
-              <a href="/login" class="text-blue-600 hover:underline">Login</a> to add a comment
-            </p>
-            {% endif %}
+
           </div>
         </div>
       </div>
@@ -299,66 +308,119 @@
   
     // Submit a comment
     function submitComment(event, recipeId) {
-      event.preventDefault();
+  event.preventDefault();
+  
+  const form = document.getElementById('commentForm-' + recipeId);
+  const commentInput = form.querySelector('input[name="comment"]');
+  const comment = commentInput.value.trim();
+  
+  if (!comment) return;
+  
+  // Get CSRF token
+  const csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
+  
+  // Create a request
+  fetch('/recipe/' + recipeId + '/comment', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRFToken': csrfToken,
+      'Accept': 'application/json'
+    },
+    body: 'comment=' + encodeURIComponent(comment)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Find the comments container and list
+      const detailsContainer = document.getElementById('details-' + recipeId);
       
-      const form = document.getElementById('commentForm-' + recipeId);
-      const commentInput = form.querySelector('input[name="comment"]');
-      const comment = commentInput.value.trim();
+      // Find the div containing the comments
+      const commentsDiv = Array.from(detailsContainer.querySelectorAll('div.mt-4'))
+        .find(div => div.querySelector('strong') && div.querySelector('strong').textContent === 'Comments:');
       
-      if (!comment) return;
-      
-      // Get CSRF token
-      const csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
-      
-      // Create a request
-      fetch('/recipe/' + recipeId + '/comment', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'X-CSRFToken': csrfToken,
-          'Accept': 'application/json'
-        },
-        body: 'comment=' + encodeURIComponent(comment)
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          // Find the comments container and list
-          const detailsContainer = document.getElementById('details-' + recipeId);
-          
-          // Find the div containing the comments
-          const commentsDiv = Array.from(detailsContainer.querySelectorAll('div.mt-4'))
-            .find(div => div.querySelector('strong') && div.querySelector('strong').textContent === 'Comments:');
-          
-          if (commentsDiv) {
-            const commentsList = commentsDiv.querySelector('ul');
-            
-            // Remove "No comments yet" message if it exists
-            const noCommentsMsg = commentsList.querySelector('li.text-gray-500');
-            if (noCommentsMsg) {
-              noCommentsMsg.remove();
-            }
-            
-            // Add the new comment
-            const li = document.createElement('li');
-            li.textContent = data.comment;
-            commentsList.appendChild(li);
-            
-            // Clear the input
-            commentInput.value = '';
-          }
-        } else {
-          if (data.error === 'login_required') {
-            window.location.href = '/login';
-          } else {
-            alert('Error: ' + (data.error || 'Something went wrong'));
-          }
+      if (commentsDiv) {
+        const commentsList = commentsDiv.querySelector('ul');
+        
+        // Remove "No comments yet" message if it exists
+        const noCommentsMsg = commentsList.querySelector('li.text-gray-500');
+        if (noCommentsMsg) {
+          noCommentsMsg.remove();
         }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-        alert('An error occurred while submitting your comment.');
-      });
+        
+        // Add the new comment
+        const li = document.createElement('li');
+        li.className = 'flex items-start mb-1';
+        
+        // Create profile picture element
+        if (data.user_profile_picture) {
+          const img = document.createElement('img');
+          img.src = data.user_profile_picture;
+          img.alt = data.username;
+          img.className = 'w-6 h-6 object-cover rounded-full mr-2 mt-0.5';
+          li.appendChild(img);
+        } else {
+          const avatarDiv = document.createElement('div');
+          avatarDiv.className = 'w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center mr-2 mt-0.5 text-xs';
+          avatarDiv.textContent = data.username.charAt(0).toUpperCase();
+          li.appendChild(avatarDiv);
+        }
+        
+        // Add comment text with username
+        const commentDiv = document.createElement('div');
+        
+        const usernameSpan = document.createElement('span');
+        usernameSpan.className = 'font-medium';
+        usernameSpan.textContent = data.username + ': ';
+        commentDiv.appendChild(usernameSpan);
+        
+        const textSpan = document.createElement('span');
+        textSpan.textContent = data.comment_text;
+        commentDiv.appendChild(textSpan);
+        
+        li.appendChild(commentDiv);
+        commentsList.appendChild(li);
+        
+        // Clear the input
+        commentInput.value = '';
+      }
+    } else {
+      if (data.error === 'login_required') {
+        window.location.href = '/login';
+      } else {
+        alert('Error: ' + (data.error || 'Something went wrong'));
+      }
     }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+}
   </script>
+  <!-- Pagination -->
+<div class="mt-8 flex justify-center">
+  {% if total_pages > 1 %}
+    <div class="flex space-x-2">
+      {% if current_page > 1 %}
+        <a href="?page={{ current_page|add:'-1' }}" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+          Previous
+        </a>
+      {% endif %}
+      
+      {% for i in total_pages|add:'1'|get_range %}
+        {% if i > 0 %}
+          <a href="?page={{ i }}" class="px-4 py-2 {% if i == current_page %}bg-blue-500 text-white{% else %}bg-gray-200{% endif %} rounded hover:bg-gray-300">
+            {{ i }}
+          </a>
+        {% endif %}
+      {% endfor %}
+      
+      {% if current_page < total_pages %}
+        <a href="?page={{ current_page|add:'1' }}" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+          Next
+        </a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
 {% endblock %}

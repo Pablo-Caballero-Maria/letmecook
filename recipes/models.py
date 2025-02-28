@@ -1,6 +1,11 @@
-from mongoengine import Document, EmbeddedDocument, StringField, ListField, FloatField, IntField
-from mongoengine import EmbeddedDocumentField, ReferenceField
+from mongoengine import Document, EmbeddedDocument, StringField, ListField, FloatField, IntField, EmbeddedDocumentField, ReferenceField, DateTimeField
 from auth_app.models import User
+from datetime import datetime
+
+class Comment(EmbeddedDocument):
+    text = StringField(required=True)
+    author = ReferenceField('User')
+    created_at = DateTimeField(default=datetime.now)
 
 class Ingredient(EmbeddedDocument):
     name = StringField(required=True)
@@ -9,8 +14,8 @@ class Ingredient(EmbeddedDocument):
     carbohydrates = FloatField(required=True)
     protein = FloatField(required=True)
     allergens = ListField(StringField())
-    tags = ListField(StringField())
     quantity = IntField(default=1)
+    photo = StringField()
 
 class Recipe(Document):
     title = StringField(required=True)
@@ -18,12 +23,13 @@ class Recipe(Document):
     tags = ListField(StringField())
     likes = IntField(default=0) 
     dislikes = IntField(default=0)
-    comments = ListField(StringField())
+    comments = ListField(EmbeddedDocumentField(Comment))
     ingredients = ListField(EmbeddedDocumentField(Ingredient))
     duration = IntField()  # in minutes
     owner = ReferenceField(User)
     liked_by = ListField(ReferenceField(User))
     disliked_by = ListField(ReferenceField(User))
+    photo = StringField()
 
     @property
     def total_calories(self):
@@ -48,4 +54,4 @@ class GlobalIngredient(Document):
     carbohydrates = FloatField(required=True)
     protein = FloatField(required=True)
     allergens = ListField(StringField())
-    tags = ListField(StringField())
+    photo = StringField()
