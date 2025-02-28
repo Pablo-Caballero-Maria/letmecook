@@ -1,0 +1,74 @@
+<!-- HTML — home/templates/base.html -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}Let Me Cook{% endblock %}</title>
+    <!-- Tailwind via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body class="bg-gray-50 text-gray-800 flex flex-col min-h-screen">
+    <!-- Header -->
+    <nav class="bg-white shadow">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex justify-between h-16">
+          <div class="flex items-center">
+            <a href="/" class="text-2xl font-bold text-gray-900">Let Me Cook</a>
+          </div>
+          <div class="flex items-center space-x-4">
+              <!-- Dropdown menu -->
+              <div class="relative group">
+                <button class="inline-flex items-center px-3 py-2 text-gray-600 hover:text-gray-900 focus:outline-none">
+                  Recipes
+                  <svg class="ml-1 h-4 w-4 fill-current" viewBox="0 0 20 20">
+                    <path d="M5.516 7.548L10 12.032l4.484-4.484L16 8.064l-6 6-6-6z"/>
+                  </svg>
+                </button>
+                <div class="absolute h-2 w-full top-full left-0"></div>
+                <div class="absolute right-0 mt-2 w-40 bg-white border rounded shadow-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 group-hover:pointer-events-auto pointer-events-none transition-all duration-200">
+                  <a href="/my-recipes" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">My recipes</a>
+                  <a href="/saved-recipes" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Saved recipes</a>
+                  <a href="/explore" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Explore</a>
+                </div>
+              </div>
+            <a href="#features" class="text-gray-600 hover:text-gray-900">Features</a>
+            <a href="#about" class="text-gray-600 hover:text-gray-900">About</a>
+            <a href="#contact" class="text-gray-600 hover:text-gray-900">Contact</a>
+            {% if current_user %}
+            <div class="relative group z-20">
+              <button class="ml-4 px-3 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+                {{ current_user.username }}
+              </button>
+              <div class="absolute h-2 w-full top-full left-0"></div>
+              <div class="absolute right-0 mt-2 w-40 bg-white border rounded shadow-lg opacity-0 invisible group-hover:visible group-hover:opacity-100 group-hover:pointer-events-auto pointer-events-none transition-all duration-200">
+                <a href="/profile" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Profile</a>
+                <a href="/logout" class="block px-4 py-2 text-gray-700 hover:bg-gray-100">Logout</a>
+              </div>
+            </div>
+            
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </nav>
+    <div class="flex-grow">
+    {% if error %}
+    <div class="max-w-7xl mx-auto mt-4 px-4">
+      <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+        <span class="block sm:inline">{{ error }}</span>
+      </div>
+    </div>
+    {% endif %}
+
+    {% block content %}{% endblock %}
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white mt-auto">
+      <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+        <p class="text-center text-gray-600">&copy; 2025 Let Me Cook. All rights reserved.</p>
+      </div>
+    </footer>
+  </body>
+</html>

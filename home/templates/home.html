@@ -1,0 +1,104 @@
+<!-- HTML — home/templates/home.html -->
+{% extends "base.html" %}
+{% block title %}Let Me Cook{% endblock %}
+{% block content %}
+  <!-- Hero Section -->
+  <header class="bg-white">
+    <div class="max-w-7xl mx-auto py-20 px-4 sm:py-24 sm:px-6 lg:px-8">
+      <div class="text-center">
+        <h1 class="text-4xl font-extrabold text-gray-900 sm:text-5xl">
+          Welcome to Let Me Cook
+        </h1>
+        <p class="mt-4 text-xl text-gray-600">
+          A community to share and discover new recipes.
+        </p>
+      </div>
+    </div>
+  </header>
+
+  <!-- Register and Login Buttons Section -->
+  <section id="cta" class="py-8 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <a href="/register" class="inline-block w-48 px-8 py-4 text-xl font-semibold bg-green-600 text-white rounded-md hover:bg-green-700 mr-4">
+        Register
+      </a>
+      <a href="/login" class="inline-block w-48 px-8 py-4 text-xl font-semibold bg-blue-600 text-white rounded-md hover:bg-blue-700">
+        Login
+      </a>
+    </div>
+  </section>
+
+  <!-- About Section -->
+  <section id="about" class="py-16 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-extrabold text-gray-900">About Us</h2>
+        <p class="mt-4 text-lg text-gray-600">
+          Let Me Cook is a social network for sharing and discovering delicious recipes. Join our community to cook, share, and connect!
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section id="features" class="py-16 bg-gray-100">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-extrabold text-gray-900">Features</h2>
+        <p class="mt-4 text-lg text-gray-600">
+          Explore the power behind our platform.
+        </p>
+      </div>
+      <div class="flex flex-wrap -mx-4">
+        <div class="w-full md:w-1/3 px-4 mb-8">
+          <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-xl font-bold mb-2">My recipes</h3>
+            <p class="text-gray-600">All of your recipes, within a click reach. See, create or delete them in a matter of seconds</p>
+          </div>
+        </div>
+        <div class="w-full md:w-1/3 px-4 mb-8">
+          <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-xl font-bold mb-2">Community</h3>
+            <p class="text-gray-600">Discover a vibrant, always expanding community</p>
+          </div>
+        </div>
+        <div class="w-full md:w-1/3 px-4 mb-8">
+          <div class="bg-white p-6 rounded-lg shadow">
+            <h3 class="text-xl font-bold mb-2">Modern UX</h3>
+            <p class="text-gray-600">Responsivity and interactivity oriented, for a seamless user experience</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contact Section -->
+  <section id="contact" class="py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-extrabold text-gray-900">Get in Touch</h2>
+        <p class="mt-4 text-lg text-gray-600">
+          We'd love to hear from you!
+        </p>
+      </div>
+      <div class="max-w-lg mx-auto">
+        <form action="#" method="POST" class="space-y-6">
+          {% csrf_token %}
+          <div>
+            <label for="name" class="block text-sm font-medium text-gray-700">Name</label>
+            <input type="text" name="name" id="name" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Your Name">
+          </div>
+          <div>
+            <label for="message" class="block text-sm font-medium text-gray-700">Message</label>
+            <textarea id="message" name="message" rows="4" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="How can we help?"></textarea>
+          </div>
+          <div class="text-center">
+            <button type="submit" class="px-6 py-3 border border-transparent text-lg font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+              Send Message
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </section>
+{% endblock %}

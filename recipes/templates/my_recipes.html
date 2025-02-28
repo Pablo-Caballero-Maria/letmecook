@@ -1,0 +1,362 @@
+{% extends "base.html" %}
+{% block title %}My Recipes - Let Me Cook{% endblock %}
+{% block content %}
+  {% if error %}
+  <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+    <span class="block sm:inline">{{ error }}</span>
+  </div>
+  {% endif %}
+
+  {% if success %}
+  <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
+    <span class="block sm:inline">{{ success }}</span>
+  </div>
+  {% endif %}
+  <div class="max-w-7xl mx-auto py-8 px-4">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">My Recipes</h1>
+      <button onclick="openModal('createModal')" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">
+        Create New Recipe
+      </button>
+    </div>
+
+    <div class="space-y-4">
+      {% for recipe in recipes %}
+      <div class="border rounded-lg p-4">
+        <div class="flex justify-between items-center">
+          <h2 class="text-xl font-semibold">{{ recipe.title }}</h2>
+          <div class="space-x-2">
+            <button class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300" onclick="toggleDetails('details-{{ recipe.id }}')">
+              Details
+            </button>
+            <button onclick="openModal('updateModal-{{ recipe.id }}')" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+              Update
+            </button>
+              <button onclick="confirmDelete('/recipe/delete/{{ recipe.id }}')" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">
+                Delete
+              </button>
+          </div>
+        </div>
+        <div id="details-{{ recipe.id }}" class="mt-4 hidden">
+          <p class="mb-2"><strong>Description:</strong> {{ recipe.description }}</p>
+          <p class="mb-2"><strong>Tags:</strong> {{ recipe.tags|join:", " }}</p>
+          <p class="mb-2">
+            <strong>Likes:</strong> {{ recipe.likes }} 
+            <strong>Dislikes:</strong> {{ recipe.dislikes }}
+          </p>
+          <p class="mb-2"><strong>Duration:</strong> {{ recipe.duration }} minutes</p>
+          <div>
+            <strong>Ingredients:</strong>
+            <ul class="list-disc ml-6">
+              {% for ingredient in recipe.ingredients %}
+              <li>
+                {{ ingredient.name }} 
+                (Calories: {{ ingredient.calories }}, Fat: {{ ingredient.fat }}, Carbs: {{ ingredient.carbohydrates }}, Protein: {{ ingredient.protein }}) 
+                {% if ingredient.quantity %}
+                  &mdash; Quantity: {{ ingredient.quantity }}
+                {% endif %}
+                <br>
+                <em>Allergens:</em> {{ ingredient.allergens|join:", " }}; 
+                <em>Tags:</em> {{ ingredient.tags|join:", " }}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          <!-- Total nutritional summary (assumed computed on the model or in view) -->
+          <div class="mt-4 p-2 rounded bg-gray-100">
+            <strong>Total Nutrition:</strong>
+            <p>Calories: {{ recipe.total_calories }}</p>
+            <p>Fat: {{ recipe.total_fat }}</p>
+            <p>Carbohydrates: {{ recipe.total_carbohydrates }}</p>
+            <p>Protein: {{ recipe.total_protein }}</p>
+          </div>
+          <div class="mt-2">
+            <strong>Comments:</strong>
+            <ul class="list-disc ml-6">
+              {% for comment in recipe.comments %}
+              <li>{{ comment }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Update Recipe Modal -->
+      <div id="updateModal-{{ recipe.id }}" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+          <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('updateModal-{{ recipe.id }}')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
+            <h2 class="text-2xl font-bold mb-4">Update Recipe</h2>
+            <form action="/recipe/update/{{ recipe.id }}" method="POST">
+              {% csrf_token %}
+              <div class="mb-4">
+                <label class="block">Title</label>
+                <input name="title" type="text" value="{{ recipe.title }}" class="border rounded w-full p-2">
+              </div>
+              <div class="mb-4">
+                <label class="block">Description</label>
+                <textarea name="description" class="border rounded w-full p-2">{{ recipe.description }}</textarea>
+              </div>
+              <div class="mb-4">
+                <label class="block">Tags</label>
+                <div id="tagsContainer-{{ recipe.id }}">
+                  {% for tag in recipe.tags %}
+                  <div class="flex items-center space-x-2 mb-2">
+                    <input type="text" name="tags" value="{{ tag }}" class="border rounded p-1">
+                    <button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>
+                  </div>
+                  {% endfor %}
+                </div>
+                <select onchange="addTag(this, 'tagsContainer-{{ recipe.id }}')" class="border rounded p-1">
+                  <option value="">Add tag</option>
+                  {% for tag in tags %}
+                  <option value="{{ tag }}">{{ tag }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-4">
+                <label class="block">Ingredients (choose and set quantity)</label>
+                <div id="ingredientsContainer-{{ recipe.id }}">
+                  {% for ingredient in recipe.ingredients %}
+                  <div class="flex items-center space-x-2 mb-2">
+                    <input type="text" name="ingredients" value="{{ ingredient.name }}" class="border rounded p-1" readonly>
+                    <input type="number" name="quantities" value="{{ ingredient.quantity|default:'1' }}" min="1" placeholder="Quantity" class="border rounded p-1 w-24">
+                    <button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>
+                  </div>
+                  {% endfor %}
+                </div>
+                <select onchange="addIngredient(this, 'ingredientsContainer-{{ recipe.id }}')" class="border rounded p-1">
+                  <option value="">Add ingredient</option>
+                  {% for ingredient in ingredients %}
+                  <option value="{{ ingredient.name }}||{{ ingredient.calories }}||{{ ingredient.fat }}||{{ ingredient.carbohydrates }}||{{ ingredient.protein }}||{{ ingredient.allergens|join:';' }}||{{ ingredient.tags|join:';' }}">{{ ingredient.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="mb-4">
+                <label class="block">Duration (minutes)</label>
+                <input name="duration" type="number" value="{{ recipe.duration }}" min="1" class="border rounded w-full p-2">
+              </div>
+              <div class="text-right">
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Create Recipe Modal -->
+  <div id="createModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center p-4">
+      <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg relative max-h-[90vh] overflow-y-auto">
+        <button onclick="closeModal('createModal')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
+        <h2 class="text-2xl font-bold mb-4">Create New Recipe</h2>
+        <form action="/recipe/new" method="POST" onsubmit="return validateRecipeForm(this)">        {% csrf_token %}
+          <div class="mb-4">
+            <label class="block">Title</label>
+            <input name="title" type="text" placeholder="Recipe title" class="border rounded w-full p-2">
+            <span class="text-red-500 text-sm hidden error-message" id="title-error">Title is required</span>
+          </div>
+          <div class="mb-4">
+            <label class="block">Description</label>
+            <textarea name="description" placeholder="Description" class="border rounded w-full p-2"></textarea>
+            <span class="text-red-500 text-sm hidden error-message" id="description-error">Description is required</span>
+          </div>
+          <div class="mb-4">
+            <label class="block">Tags</label>
+            <div id="newTagsContainer"></div>
+            <select onchange="addTag(this, 'newTagsContainer')" class="border rounded p-1">
+              <option value="">Add tag</option>
+              {% for tag in tags %}
+              <option value="{{ tag }}">{{ tag }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-4">
+            <label class="block">Ingredients (choose and set quantity)</label>
+            <div id="newIngredientsContainer"></div>
+            <select onchange="addIngredient(this, 'newIngredientsContainer')" class="border rounded p-1">
+              <option value="">Add ingredient</option>
+              {% for ingredient in ingredients %}
+              <option value="{{ ingredient.name }}||{{ ingredient.calories }}||{{ ingredient.fat }}||{{ ingredient.carbohydrates }}||{{ ingredient.protein }}||{{ ingredient.allergens|join:';' }}||{{ ingredient.tags|join:';' }}">{{ ingredient.name }}</option>
+              {% endfor %}
+            </select>
+            <span class="text-red-500 text-sm hidden error-message" id="ingredients-error">At least one ingredient is required</span>
+          </div>
+          <div class="mb-4">
+            <label class="block">Duration (minutes)</label>
+            <input name="duration" type="number" min="1" placeholder="Duration" class="border rounded w-full p-2">
+            <span class="text-red-500 text-sm hidden error-message" id="duration-error">Duration is required</span>
+          </div>
+          <div class="text-right">
+            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">Create Recipe</button>
+          </div>
+        </form>
+      </div>
+    </div> 
+  </div>
+
+  <!-- JavaScript for modals and dynamic fields -->
+  <script>
+    function openModal(id) {
+    document.getElementById(id).classList.remove('hidden');
+    document.body.style.overflow = 'hidden';  // Prevent scrolling
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.add('hidden');
+      document.body.style.overflow = '';  // Restore scrolling
+    }
+
+    function confirmDelete(deleteUrl) {
+      document.getElementById('deleteRecipeForm').action = deleteUrl;
+      openModal('deleteConfirmModal');
+    }
+
+    function toggleDetails(id) {
+      document.getElementById(id).classList.toggle('hidden');
+    }
+
+    function removeElement(el, value) {
+      var container = el.closest('form');
+      
+      // If this is a tag
+      if (el.previousElementSibling.name === "tags") {
+        var tagValue = el.previousElementSibling.value;
+        var tagSelect = container.querySelector('select[onchange*="addTag"]');
+        var option = document.createElement('option');
+        option.value = tagValue;
+        option.text = tagValue;
+        tagSelect.add(option);
+      } 
+
+      // If this is an ingredient
+      else if (el.previousElementSibling.name === "quantities") {
+        var ingredientName = el.previousElementSibling.previousElementSibling.value;
+        var ingredientSelect = container.querySelector('select[onchange*="addIngredient"]');
+        if (value) {
+          var option = document.createElement('option');
+          option.value = value;
+          option.text = ingredientName;
+          ingredientSelect.add(option);
+        }
+      }
+      
+      el.parentElement.remove();
+    }
+    
+    // Add tag row (unchanged)
+    function addTag(select, containerId) {
+      var value = select.value;
+      if (value) {
+        var container = document.getElementById(containerId);
+        var div = document.createElement('div');
+        div.className = "flex items-center space-x-2 mb-2";
+        div.innerHTML = '<input type="text" name="tags" value="'+value+'" class="border rounded p-1" readonly>' +
+                        '<button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>';
+        container.appendChild(div);
+
+        // Remove the option from the dropdown
+        var option = select.querySelector('option[value="'+value+'"]');
+        if (option) option.remove();
+
+        select.selectedIndex = 0;
+      }
+    }
+
+    function addIngredient(select, containerId) {
+      var value = select.value;
+      if (value) {
+        // Expect value in format: name||calories||fat||carbs||protein||allergens||tags
+        var parts = value.split("||");
+        var name = parts[0];
+        var container = document.getElementById(containerId);
+        var div = document.createElement('div');
+        div.className = "flex items-center space-x-2 mb-2";
+        div.innerHTML = '<input type="text" name="ingredients" value="'+name+'" class="border rounded p-1" readonly>' +
+                        '<input type="number" name="quantities" value="1" min="1" placeholder="Quantity" class="border rounded p-1 w-24">'
+                        '<button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>';
+        container.appendChild(div);
+
+        // Remove the option from the dropwdown
+        var option = select.querySelector('option[value="'+value+'"]');
+        if (option) option.remove();
+
+        select.selectedIndex = 0;
+      }
+    }
+
+  function validateRecipeForm(formElement) {
+    let isValid = true;
+    
+    // Title validation
+    const title = formElement.querySelector('input[name="title"]');
+    const titleError = formElement.querySelector('#title-error');
+    
+    if (!title.value.trim()) {
+      titleError.classList.remove('hidden');
+      isValid = false;
+    } else {
+      titleError.classList.add('hidden');
+    }
+    
+    // Description validation
+    const description = formElement.querySelector('textarea[name="description"]');
+    const descriptionError = formElement.querySelector('#description-error');
+    if (!description.value.trim()) {
+      descriptionError.classList.remove('hidden');
+      isValid = false;
+    } else {
+      descriptionError.classList.add('hidden');
+    }
+
+    // Ingredients validation
+    const ingredients = formElement.querySelectorAll('input[name="ingredients"]');
+    const ingredientsError = formElement.querySelector('#ingredients-error');
+    
+    if (ingredients.length === 0) {
+      ingredientsError.classList.remove('hidden');
+      isValid = false;
+    } else {
+      ingredientsError.classList.add('hidden');
+    }
+  
+    // Duration validation
+    const duration = formElement.querySelector('input[name="duration"]');
+    const durationError = formElement.querySelector('#duration-error');
+    if (!duration.value.trim()) {
+      durationError.classList.remove('hidden');
+      isValid = false;
+    } else {
+      durationError.classList.add('hidden');
+    }
+
+    return isValid;
+}
+
+  </script>
+  
+  <!-- Delete Confirmation Modal -->
+<div id="deleteConfirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+  <div class="flex min-h-full items-center justify-center p-4">
+    <div class="bg-white w-full max-w-md p-6 rounded shadow-lg relative">
+      <button onclick="closeModal('deleteConfirmModal')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
+      <h2 class="text-2xl font-bold mb-4 text-center">Confirm Deletion</h2>
+      <p class="mb-6 text-center">Are you sure you want to delete this recipe? This action cannot be undone.</p>
+      <div class="flex justify-between">
+        <button onclick="closeModal('deleteConfirmModal')" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+          Cancel
+        </button>
+        <form id="deleteRecipeForm" action="" method="POST" class="inline">
+          {% csrf_token %}
+          <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+            Delete Recipe
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

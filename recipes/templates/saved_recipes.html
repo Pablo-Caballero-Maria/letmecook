@@ -1,0 +1,364 @@
+{% extends "base.html" %}
+{% block title %}Saved Recipes - Let Me Cook{% endblock %}
+{% block content %}
+  <div class="max-w-7xl mx-auto py-8 px-4">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">Saved Recipes</h1>
+    </div>
+
+    <!-- Search form -->
+    <div class="mb-8">
+      <form action="/search" method="GET" class="flex space-x-2 mb-6">
+        <input 
+          type="text" 
+          name="q" 
+          placeholder="Search recipes, ingredients, or tags..." 
+          class="flex-grow px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+        <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          Search
+        </button>
+      </form>
+    </div>
+
+    <div class="space-y-4">
+      {% for recipe in recipes %}
+      <div class="border rounded-lg p-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-xl font-semibold">{{ recipe.title }}</h2>
+            <p class="text-sm text-gray-500">By: {{ recipe.owner.username }}</p>
+          </div>
+          <div>
+            <button class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300" onclick="toggleDetails('details-{{ recipe.id }}')">
+              Details
+            </button>
+          </div>
+        </div>
+        <div id="details-{{ recipe.id }}" class="mt-4 hidden">
+          <p class="mb-2"><strong>Description:</strong> {{ recipe.description }}</p>
+          <p class="mb-2"><strong>Tags:</strong> {{ recipe.tags|join:", " }}</p>
+          <p class="mb-2">
+            <strong>Likes:</strong> {{ recipe.likes }} 
+            <strong>Dislikes:</strong> {{ recipe.dislikes }}
+          </p>
+          <p class="mb-2"><strong>Duration:</strong> {{ recipe.duration }} minutes</p>
+          <div>
+            <strong>Ingredients:</strong>
+            <ul class="list-disc ml-6">
+              {% for ingredient in recipe.ingredients %}
+              <li>
+                {{ ingredient.name }}
+                (Calories: {{ ingredient.calories }}, Fat: {{ ingredient.fat }}, Carbs: {{ ingredient.carbohydrates }}, Protein: {{ ingredient.protein }})
+                {% if ingredient.quantity %}
+                  &mdash; Quantity: {{ ingredient.quantity }}
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          <div class="mt-4 p-2 rounded bg-gray-100">
+            <strong>Total Nutrition:</strong>
+            <p>Calories: {{ recipe.total_calories }}</p>
+            <p>Fat: {{ recipe.total_fat }}</p>
+            <p>Carbohydrates: {{ recipe.total_carbohydrates }}</p>
+            <p>Protein: {{ recipe.total_protein }}</p>
+          </div>
+          
+          <!-- Interaction buttons here -->
+          <div class="flex flex-wrap gap-2 mt-4">
+            <!-- Like button -->
+            <button onclick="likeRecipe('{{ recipe.id }}')" 
+              id="like-btn-{{ recipe.id }}"
+              class="{% if current_user in recipe.liked_by %}bg-green-500 text-white{% else %}bg-green-100 text-green-800{% endif %} hover:bg-green-200 font-bold py-1 px-3 rounded">
+              👍 <span id="likes-count-{{ recipe.id }}">{{ recipe.likes }}</span>
+            </button>
+            
+            <!-- Dislike button -->
+            <button onclick="dislikeRecipe('{{ recipe.id }}')"
+              id="dislike-btn-{{ recipe.id }}"
+              class="{% if current_user in recipe.disliked_by %}bg-red-500 text-white{% else %}bg-red-100 text-red-800{% endif %} hover:bg-red-200 font-bold py-1 px-3 rounded">
+              👎 <span id="dislikes-count-{{ recipe.id }}">{{ recipe.dislikes }}</span>
+            </button>
+            
+            <!-- Save button -->
+            <button onclick="saveRecipe('{{ recipe.id }}')"
+              id="save-btn-{{ recipe.id }}"
+              class="bg-blue-500 text-white hover:bg-blue-600 font-bold py-1 px-3 rounded">
+              <span id="save-text-{{ recipe.id }}">⭐ Saved</span>
+            </button>
+          </div>
+
+          <!-- Comment section -->
+          <div class="mt-4">
+            <strong>Comments:</strong>
+            <ul class="list-disc ml-6 mt-2">
+              {% for comment in recipe.comments %}
+              <li>{{ comment }}</li>
+              {% empty %}
+              <li class="text-gray-500">No comments yet</li>
+              {% endfor %}
+            </ul>
+
+            <!-- Comment form -->
+            {% if current_user %}
+            <form id="commentForm-{{ recipe.id }}" onsubmit="submitComment(event, '{{ recipe.id }}')" class="mt-2 flex space-x-2">
+              {% csrf_token %}
+              <input type="text" name="comment" placeholder="Add a comment..." class="flex-grow px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+                Comment
+              </button>
+            </form>
+            {% else %}
+            <p class="mt-2 text-sm text-gray-500">
+              <a href="/login" class="text-blue-600 hover:underline">Login</a> to add a comment
+            </p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% empty %}
+      <div class="p-6 text-center">
+        <p class="text-gray-500">You haven't saved any recipes yet.</p>
+        <p class="mt-2">
+          <a href="/explore" class="text-blue-600 hover:underline">Explore recipes</a> to find and save your favorites!
+        </p>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Include the same JavaScript as in explore_recipes.html -->
+  <script>
+    function toggleDetails(id) {
+      document.getElementById(id).classList.toggle('hidden');
+    }
+  
+    // Get CSRF token from cookies for AJAX requests
+    function getCsrfToken() {
+      const name = 'csrftoken';
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+  
+    // Like a recipe
+    function likeRecipe(recipeId) {
+      const csrfToken = getCsrfToken();
+      
+      fetch('/recipe/' + recipeId + '/like', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Update like count
+          document.getElementById('likes-count-' + recipeId).textContent = data.likes;
+          
+          // Update button styling
+          const likeBtn = document.getElementById('like-btn-' + recipeId);
+          const dislikeBtn = document.getElementById('dislike-btn-' + recipeId);
+          const dislikeCount = document.getElementById('dislikes-count-' + recipeId);
+          
+          if (data.liked) {
+            likeBtn.classList.replace('bg-green-100', 'bg-green-500');
+            likeBtn.classList.replace('text-green-800', 'text-white');
+          } else {
+            likeBtn.classList.replace('bg-green-500', 'bg-green-100');
+            likeBtn.classList.replace('text-white', 'text-green-800');
+          }
+          
+          // If disliking was removed as a result of liking
+          if (data.dislike_removed) {
+            dislikeBtn.classList.replace('bg-red-500', 'bg-red-100');
+            dislikeBtn.classList.replace('text-white', 'text-red-800');
+            dislikeCount.textContent = data.dislikes;
+          }
+        } else {
+          if (data.error === 'login_required') {
+            window.location.href = '/login';
+          } else {
+            alert('Error: ' + (data.error || 'Something went wrong'));
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    }
+  
+    // Dislike a recipe
+    function dislikeRecipe(recipeId) {
+      const csrfToken = getCsrfToken();
+      
+      fetch('/recipe/' + recipeId + '/dislike', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Update dislike count
+          document.getElementById('dislikes-count-' + recipeId).textContent = data.dislikes;
+          
+          // Update button styling
+          const dislikeBtn = document.getElementById('dislike-btn-' + recipeId);
+          const likeBtn = document.getElementById('like-btn-' + recipeId);
+          const likeCount = document.getElementById('likes-count-' + recipeId);
+          
+          if (data.disliked) {
+            dislikeBtn.classList.replace('bg-red-100', 'bg-red-500');
+            dislikeBtn.classList.replace('text-red-800', 'text-white');
+          } else {
+            dislikeBtn.classList.replace('bg-red-500', 'bg-red-100');
+            dislikeBtn.classList.replace('text-white', 'text-red-800');
+          }
+          
+          // If liking was removed as a result of disliking
+          if (data.like_removed) {
+            likeBtn.classList.replace('bg-green-500', 'bg-green-100');
+            likeBtn.classList.replace('text-white', 'text-green-800');
+            likeCount.textContent = data.likes;
+          }
+        } else {
+          if (data.error === 'login_required') {
+            window.location.href = '/login';
+          } else {
+            alert('Error: ' + (data.error || 'Something went wrong'));
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    }
+  
+    // Save a recipe
+    function saveRecipe(recipeId) {
+      const csrfToken = getCsrfToken();
+      
+      fetch('/recipe/' + recipeId + '/save', {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          if (!data.saved) {
+            // If the recipe was unsaved, remove it from the list
+            const recipeElement = document.getElementById('save-btn-' + recipeId).closest('.border.rounded-lg');
+            recipeElement.remove();
+            
+            // Check if there are no more recipes
+            const recipeContainer = document.querySelector('.space-y-4');
+            if (recipeContainer.children.length === 0) {
+              recipeContainer.innerHTML = `
+                <div class="p-6 text-center">
+                  <p class="text-gray-500">You haven't saved any recipes yet.</p>
+                  <p class="mt-2">
+                    <a href="/explore" class="text-blue-600 hover:underline">Explore recipes</a> to find and save your favorites!
+                  </p>
+                </div>
+              `;
+            }
+          }
+        } else {
+          if (data.error === 'login_required') {
+            window.location.href = '/login';
+          } else {
+            alert('Error: ' + (data.error || 'Something went wrong'));
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    }
+  
+    // Submit a comment
+    function submitComment(event, recipeId) {
+      event.preventDefault();
+      
+      const form = document.getElementById('commentForm-' + recipeId);
+      const commentInput = form.querySelector('input[name="comment"]');
+      const comment = commentInput.value.trim();
+      
+      if (!comment) return;
+      
+      // Get CSRF token
+      const csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
+      
+      // Create a request
+      fetch('/recipe/' + recipeId + '/comment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-CSRFToken': csrfToken,
+          'Accept': 'application/json'
+        },
+        body: 'comment=' + encodeURIComponent(comment)
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Find the comments container and list
+          const detailsContainer = document.getElementById('details-' + recipeId);
+          
+          // Find the div containing the comments
+          const commentsDiv = Array.from(detailsContainer.querySelectorAll('div.mt-4'))
+            .find(div => div.querySelector('strong') && div.querySelector('strong').textContent === 'Comments:');
+          
+          if (commentsDiv) {
+            const commentsList = commentsDiv.querySelector('ul');
+            
+            // Remove "No comments yet" message if it exists
+            const noCommentsMsg = commentsList.querySelector('li.text-gray-500');
+            if (noCommentsMsg) {
+              noCommentsMsg.remove();
+            }
+            
+            // Add the new comment
+            const li = document.createElement('li');
+            li.textContent = data.comment;
+            commentsList.appendChild(li);
+            
+            // Clear the input
+            commentInput.value = '';
+          }
+        } else {
+          if (data.error === 'login_required') {
+            window.location.href = '/login';
+          } else {
+            alert('Error: ' + (data.error || 'Something went wrong'));
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred while submitting your comment.');
+      });
+    }
+  </script>
+{% endblock %}

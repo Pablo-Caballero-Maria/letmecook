@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Search Results - Let Me Cook{% endblock %}
+{% block content %}
+  <div class="max-w-7xl mx-auto py-8 px-4">
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold mb-4">Search Results {% if query %}for "{{ query }}"{% endif %}</h1>
+      
+      <!-- Search form -->
+      <form action="/search" method="GET" class="flex space-x-2 mb-6">
+        <input 
+          type="text" 
+          name="q" 
+          value="{{ query }}" 
+          placeholder="Search recipes, ingredients, or tags..." 
+          class="flex-grow px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+        <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+          Search
+        </button>
+      </form>
+    </div>
+
+    <div class="space-y-4">
+      {% for recipe in recipes %}
+      <div class="border rounded-lg p-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-xl font-semibold">{{ recipe.title }}</h2>
+            <p class="text-sm text-gray-500">By: {{ recipe.owner.username }}</p>
+          </div>
+          <div>
+            <button class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300" onclick="toggleDetails('details-{{ recipe.id }}')">
+              Details
+            </button>
+          </div>
+        </div>
+        <div id="details-{{ recipe.id }}" class="mt-4 hidden">
+          <p class="mb-2"><strong>Description:</strong> {{ recipe.description }}</p>
+          <p class="mb-2"><strong>Tags:</strong> {{ recipe.tags|join:", " }}</p>
+          <p class="mb-2"><strong>Punctuation:</strong> {{ recipe.punctuation }}</p>
+          <p class="mb-2"><strong>Duration:</strong> {{ recipe.duration }} minutes</p>
+          <div>
+            <strong>Ingredients:</strong>
+            <ul class="list-disc ml-6">
+              {% for ingredient in recipe.ingredients %}
+              <li>
+                {{ ingredient.name }}
+                (Calories: {{ ingredient.calories }}, Fat: {{ ingredient.fat }}, Carbs: {{ ingredient.carbohydrates }}, Protein: {{ ingredient.protein }})
+                {% if ingredient.quantity %}
+                  &mdash; Quantity: {{ ingredient.quantity }}
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          <div class="mt-4 p-2 rounded bg-gray-100">
+            <strong>Total Nutrition:</strong>
+            <p>Calories: {{ recipe.total_calories }}</p>
+            <p>Fat: {{ recipe.total_fat }}</p>
+            <p>Carbohydrates: {{ recipe.total_carbohydrates }}</p>
+            <p>Protein: {{ recipe.total_protein }}</p>
+          </div>
+          
+          {% if recipe.comments %}
+          <div class="mt-2">
+            <strong>Comments:</strong>
+            <ul class="list-disc ml-6">
+              {% for comment in recipe.comments %}
+              <li>{{ comment }}</li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% endif %}
+          
+          <!-- Comment form -->
+          {% if current_user %}
+          <div class="mt-4 border-t pt-4">
+            <form id="commentForm-{{ recipe.id }}" onsubmit="submitComment(event, '{{ recipe.id }}')" class="flex space-x-2">
+              {% csrf_token %}
+              <input type="text" name="comment" placeholder="Add a comment..." class="flex-grow px-3 py-1 border rounded">
+              <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Comment</button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% empty %}
+      <div class="p-8 text-center">
+        {% if query %}
+          <p class="text-gray-600">No recipes found matching "{{ query }}".</p>
+          <p class="mt-2 text-gray-500">Try different keywords or check your spelling.</p>
+        {% else %}
+          <p class="text-gray-600">Enter a search term to find recipes.</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+<script>
+  function toggleDetails(id) {
+    document.getElementById(id).classList.toggle('hidden');
+  }
+  
+  // Get CSRF token from cookies for AJAX requests
+  function getCsrfToken() {
+    const name = 'csrftoken';
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+  
+  // Submit a comment
+  function submitComment(event, recipeId) {
+    event.preventDefault();
+    
+    const form = document.getElementById('commentForm-' + recipeId);
+    const commentInput = form.querySelector('input[name="comment"]');
+    const comment = commentInput.value.trim();
+    
+    if (!comment) return;
+    
+    // Get CSRF token
+    const csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
+    
+    // Create a request
+    fetch('/recipe/' + recipeId + '/comment', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-CSRFToken': csrfToken,
+        'Accept': 'application/json'
+      },
+      body: 'comment=' + encodeURIComponent(comment)
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        // Add the new comment to the list
+        const commentsList = document.querySelector('#details-' + recipeId + ' ul');
+        
+        // If no comments section exists yet, create one
+        if (!commentsList) {
+          const detailsDiv = document.querySelector('#details-' + recipeId);
+          const commentsDiv = document.createElement('div');
+          commentsDiv.className = 'mt-2';
+          commentsDiv.innerHTML = '<strong>Comments:</strong><ul class="list-disc ml-6"></ul>';
+          detailsDiv.appendChild(commentsDiv);
+          commentsList = commentsDiv.querySelector('ul');
+        }
+        
+        // Remove "No comments yet" message if it exists
+        const noCommentsMsg = commentsList.querySelector('.text-gray-500');
+        if (noCommentsMsg) {
+          noCommentsMsg.remove();
+        }
+        
+        // Add the new comment
+        const li = document.createElement('li');
+        li.textContent = data.comment;
+        commentsList.appendChild(li);
+        
+        // Clear the input
+        commentInput.value = '';
+      } else {
+        if (data.error === 'login_required') {
+          window.location.href = '/login';
+        } else {
+          alert('Error: ' + (data.error || 'Something went wrong'));
+        }
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      alert('An error occurred while submitting your comment.');
+    });
+  }
+</script>
+{% endblock %}
