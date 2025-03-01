@@ -1,4 +1,6 @@
 <!-- HTML — home/templates/base.html -->
+{% load static %}
+
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -7,6 +9,7 @@
         <title>
             {% block title %}Let Me Cook{% endblock %}
         </title>
+        <link rel="icon" type="image/png" href="{% static 'favicon.png' %}">
         <!-- Tailwind via CDN -->
         <script src="https://cdn.tailwindcss.com"></script>
     </head>
@@ -16,7 +19,10 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between h-16">
                     <div class="flex items-center">
-                        <a href="/" class="text-2xl font-bold text-gray-900">Let Me Cook</a>
+                        <a href="/" class="flex items-center text-2xl font-bold text-gray-900">
+                            <img src="{% static 'favicon.png' %}" alt="Logo" class="h-8 w-8 mr-2">
+                            Let Me Cook
+                        </a>
                     </div>
                     <div class="flex items-center space-x-4">
                         <!-- Dropdown menu -->
