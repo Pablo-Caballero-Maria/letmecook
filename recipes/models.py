@@ -1,11 +1,17 @@
-from mongoengine import Document, EmbeddedDocument, StringField, ListField, FloatField, IntField, EmbeddedDocumentField, ReferenceField, DateTimeField
-from auth_app.models import User
 from datetime import datetime
+
+from mongoengine import (DateTimeField, Document, EmbeddedDocument,
+                         EmbeddedDocumentField, FloatField, IntField,
+                         ListField, ReferenceField, StringField)
+
+from auth_app.models import User
+
 
 class Comment(EmbeddedDocument):
     text = StringField(required=True)
-    author = ReferenceField('User')
+    author = ReferenceField("User")
     created_at = DateTimeField(default=datetime.now)
+
 
 class Ingredient(EmbeddedDocument):
     name = StringField(required=True)
@@ -17,11 +23,12 @@ class Ingredient(EmbeddedDocument):
     quantity = IntField(default=1)
     photo = StringField()
 
+
 class Recipe(Document):
     title = StringField(required=True)
     description = StringField()
     tags = ListField(StringField())
-    likes = IntField(default=0) 
+    likes = IntField(default=0)
     dislikes = IntField(default=0)
     comments = ListField(EmbeddedDocumentField(Comment))
     ingredients = ListField(EmbeddedDocumentField(Ingredient))
@@ -33,19 +40,36 @@ class Recipe(Document):
 
     @property
     def total_calories(self):
-        return sum(ing.calories * (ing.quantity or 1) for ing in self.ingredients) if self.ingredients else 0
-    
+        return (
+            sum(ing.calories * (ing.quantity or 1) for ing in self.ingredients)
+            if self.ingredients
+            else 0
+        )
+
     @property
     def total_fat(self):
-        return sum(ing.fat * (ing.quantity or 1) for ing in self.ingredients) if self.ingredients else 0
-    
+        return (
+            sum(ing.fat * (ing.quantity or 1) for ing in self.ingredients)
+            if self.ingredients
+            else 0
+        )
+
     @property
     def total_carbohydrates(self):
-        return sum(ing.carbohydrates * (ing.quantity or 1) for ing in self.ingredients) if self.ingredients else 0
-    
+        return (
+            sum(ing.carbohydrates * (ing.quantity or 1) for ing in self.ingredients)
+            if self.ingredients
+            else 0
+        )
+
     @property
     def total_protein(self):
-        return sum(ing.protein * (ing.quantity or 1) for ing in self.ingredients) if self.ingredients else 0
+        return (
+            sum(ing.protein * (ing.quantity or 1) for ing in self.ingredients)
+            if self.ingredients
+            else 0
+        )
+
 
 class GlobalIngredient(Document):
     name = StringField(required=True, unique=True)

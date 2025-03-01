@@ -13,6 +13,9 @@ python = "3.12.9"
 django = "*"
 mongoengine = "*"
 werkzeug = "*"
+black = "*"
+isort = "*"
+djlint = "*"
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,0 +1,769 @@
+{% extends "base.html" %}
+{% block title %}{{ profile_user.username }}'s Profile - Let Me Cook{% endblock %}
+{% block content %}
+    <div class="max-w-3xl mx-auto mt-8 p-6 bg-white rounded shadow">
+        <div class="flex items-center mb-6">
+            <div class="mr-6">
+                {% if profile_user.profile_picture %}
+                    <img src="{{ profile_user.profile_picture }}"
+                         alt="{{ profile_user.username }}"
+                         class="h-24 w-24 object-cover rounded-full">
+                {% else %}
+                    <div class="h-24 w-24 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 text-xl">
+                        {{ profile_user.username|first|upper }}
+                    </div>
+                {% endif %}
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold">{{ profile_user.username }}</h1>
+                <div class="flex space-x-4 text-sm mt-1 mb-3">
+                    <span class="text-gray-600"><span id="followers-count">{{ followers_count }}</span> followers</span>
+                    <span class="text-gray-600">{{ following_count }} following</span>
+                </div>
+                {% if current_user and current_user.id != profile_user.id %}
+                    <button id="follow-button"
+                            onclick="toggleFollow('{{ profile_user.username }}')"
+                            class="px-4 py-1 rounded text-sm font-medium {% if is_following %}bg-gray-200 hover:bg-gray-300{% else %}bg-blue-500 text-white hover:bg-blue-600{% endif %}">
+                        {% if is_following %}
+                            Unfollow
+                        {% else %}
+                            Follow
+                        {% endif %}
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+        <!-- Search, Filter and Sort Controls -->
+        <div class="mb-6">
+            <h2 class="text-xl font-bold mb-3">Recipes by {{ profile_user.username }}</h2>
+            <!-- Search form -->
+            <div class="mb-4">
+                <div class="flex space-x-2">
+                    <input type="text"
+                           id="searchInput"
+                           placeholder="Search recipes, ingredients, or tags..."
+                           class="flex-grow px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button id="searchButton"
+                            type="button"
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Search</button>
+                </div>
+            </div>
+            <!-- Controls row -->
+            <div class="flex flex-wrap items-end gap-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Filter by Tag</label>
+                    <button id="tagFilterButton"
+                            onclick="openTagModal()"
+                            class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded border h-10">
+                        Select Tags <span class="ml-1">▼</span>
+                    </button>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Sort by</label>
+                    <select id="sortBy" class="border rounded px-4 py-2 h-10">
+                        <option value="newest">Newest</option>
+                        <option value="likes">Most Liked</option>
+                        <option value="duration-asc">Duration (shortest first)</option>
+                        <option value="duration-desc">Duration (longest first)</option>
+                    </select>
+                </div>
+            </div>
+            <!-- Tags badges row -->
+            <div id="selectedTagsBadges" class="flex flex-wrap gap-2 mt-2">
+                <!-- Selected tag badges will appear here -->
+            </div>
+        </div>
+        <!-- Recipe Listing -->
+        <div class="space-y-4">
+            <!-- Recipes will be loaded here -->
+        </div>
+        <!-- Pagination -->
+        <div id="pagination-container" class="mt-8 flex justify-center">
+            <!-- Pagination will be loaded here -->
+        </div>
+        <!-- Tag Selection Modal -->
+        <div id="tagModal"
+             class="fixed inset-0 z-50 hidden overflow-y-auto bg-black bg-opacity-50">
+            <div class="flex min-h-full items-center justify-center p-4">
+                <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg relative max-h-[90vh] overflow-y-auto">
+                    <button onclick="closeTagModal()"
+                            class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
+                    <h2 class="text-2xl font-bold mb-4">Select Tags</h2>
+                    <div class="mb-4">
+                        <div class="font-bold mb-2">Selected Tags:</div>
+                        <div id="selectedTagsContainer" class="flex flex-wrap gap-2 mb-4">
+                            <!-- Selected tags will appear here -->
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <div class="font-bold mb-2">Available Tags:</div>
+                        <div id="availableTagsContainer"
+                             class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <!-- Available tags will appear here -->
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <button onclick="applyTagFilters()"
+                                class="px-4 py-2 bg-blue-600 text-white rounded">Apply Filters</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+    // Store filters and current state
+let currentFilters = {
+  query: '',
+  tags: [],
+  sort: 'newest',
+  page: 1,
+  username: '{{ profile_user.username }}'
+};
+
+let tempSelectedTags = [];
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize filter values from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('q')) {
+    document.getElementById('searchInput').value = urlParams.get('q');
+    currentFilters.query = urlParams.get('q');
+  }
+  if (urlParams.has('sort')) {
+    currentFilters.sort = urlParams.get('sort');
+    document.getElementById('sortBy').value = currentFilters.sort;
+  }
+  if (urlParams.has('tag')) {
+    const tags = urlParams.get('tag').split(',');
+    currentFilters.tags = tags;
+    renderSelectedTagBadges();
+  }
+  
+  // Setup event listeners
+  document.getElementById('searchInput').addEventListener('input', debounce(function() {
+    currentFilters.query = this.value;
+    currentFilters.page = 1;
+    fetchResults();
+  }, 500));
+  
+  document.getElementById('searchButton').addEventListener('click', function() {
+    currentFilters.query = document.getElementById('searchInput').value;
+    currentFilters.page = 1;
+    fetchResults();
+  });
+  
+  document.getElementById('sortBy').addEventListener('change', function() {
+    currentFilters.sort = this.value;
+    currentFilters.page = 1;
+    fetchResults();
+  });
+  
+  // Load all available tags for the modal
+  loadAllTags();
+  
+  // Load initial results
+  fetchResults();
+});
+
+// Debounce function for search
+function debounce(func, delay) {
+  let timeout;
+  return function() {
+    const context = this;
+    const args = arguments;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(context, args), delay);
+  };
+}
+
+function toggleDetails(id) {
+  document.getElementById(id).classList.toggle('hidden');
+}
+
+// Tag Modal Functions
+function openTagModal() {
+  tempSelectedTags = [...currentFilters.tags];
+  document.getElementById('tagModal').classList.remove('hidden');
+  renderTagModal();
+}
+
+function closeTagModal() {
+  document.getElementById('tagModal').classList.add('hidden');
+  tempSelectedTags = [...currentFilters.tags];
+}
+
+function loadAllTags() {
+  // Fetch all available tags from server
+  fetch('/api/tags')
+    .then(response => response.json())
+    .then(data => {
+      window.allTags = data.tags;
+      renderTagModal();
+    })
+    .catch(error => {
+      console.error("Error loading tags:", error);
+    });
+}
+
+function renderTagModal() {
+  if (!window.allTags) return;
+  
+  const availableTagsContainer = document.getElementById('availableTagsContainer');
+  const selectedTagsContainer = document.getElementById('selectedTagsContainer');
+  
+  // Clear containers
+  availableTagsContainer.innerHTML = '';
+  selectedTagsContainer.innerHTML = '';
+  
+  // Add selected tags
+  tempSelectedTags.forEach(tag => {
+    const tagEl = document.createElement('div');
+    tagEl.className = 'px-3 py-1 bg-blue-100 text-blue-800 rounded flex items-center';
+    tagEl.innerHTML = `
+      ${tag}
+      <button onclick="removeModalTag('${tag}')" class="ml-2 text-blue-500 hover:text-blue-700">&times;</button>
+    `;
+    selectedTagsContainer.appendChild(tagEl);
+  });
+  
+  // Add available tags that aren't selected
+  if (window.allTags && window.allTags.length > 0) {
+    window.allTags.filter(tag => !tempSelectedTags.includes(tag)).forEach(tag => {
+      const tagEl = document.createElement('div');
+      tagEl.className = 'px-3 py-1 bg-gray-100 text-gray-800 rounded cursor-pointer hover:bg-gray-200';
+      tagEl.textContent = tag;
+      tagEl.onclick = function() { addModalTag(tag); };
+      availableTagsContainer.appendChild(tagEl);
+    });
+  } else {
+    availableTagsContainer.innerHTML = '<p class="text-gray-500">No tags available</p>';
+  }
+}
+
+function renderSelectedTagBadges() {
+  const badgesContainer = document.getElementById('selectedTagsBadges');
+  badgesContainer.innerHTML = '';
+  
+  currentFilters.tags.forEach(tag => {
+    const badge = document.createElement('span');
+    badge.className = 'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800';
+    badge.innerHTML = `
+      ${tag}
+      <button type="button" onclick="removeTag('${tag}')" class="ml-1 flex-shrink-0 inline-flex text-blue-500 focus:outline-none">
+        &times;
+      </button>
+    `;
+    badgesContainer.appendChild(badge);
+  });
+}
+
+function addModalTag(tag) {
+  if (!tempSelectedTags.includes(tag)) {
+    tempSelectedTags.push(tag);
+    renderTagModal();
+  }
+}
+
+function removeModalTag(tag) {
+  tempSelectedTags = tempSelectedTags.filter(t => t !== tag);
+  renderTagModal();
+}
+
+function removeTag(tag) {
+  currentFilters.tags = currentFilters.tags.filter(t => t !== tag);
+  renderSelectedTagBadges();
+  fetchResults();
+}
+
+function applyTagFilters() {
+  currentFilters.tags = [...tempSelectedTags]; // Apply temporary selections
+  closeTagModal();
+  renderSelectedTagBadges();
+  currentFilters.page = 1;
+  fetchResults();
+}
+
+// Fetch and render results
+function fetchResults() {
+  // Show loading state
+  const container = document.querySelector('.space-y-4');
+  container.innerHTML = '<div class="text-center py-8"><span class="animate-spin inline-block h-6 w-6 border-t-2 border-blue-500 rounded-full"></span><span class="ml-2">Loading...</span></div>';
+  
+  // Update URL to reflect current filters (for bookmarking/sharing)
+  const url = new URL(window.location);
+  
+  if (currentFilters.query) url.searchParams.set('q', currentFilters.query);
+  else url.searchParams.delete('q');
+  
+  if (currentFilters.tags.length > 0) url.searchParams.set('tag', currentFilters.tags.join(','));
+  else url.searchParams.delete('tag');
+  
+  url.searchParams.set('sort', currentFilters.sort);
+  url.searchParams.set('page', currentFilters.page);
+  
+  // Update URL without reload
+  window.history.replaceState({}, '', url);
+  
+  // Fetch filtered results
+  fetch(`/api/recipes?${new URLSearchParams({
+    q: currentFilters.query,
+    tags: currentFilters.tags.join(','),
+    sort: currentFilters.sort,
+    page: currentFilters.page,
+    username: currentFilters.username
+  })}`)
+  .then(response => response.json())
+  .then(data => {
+    renderResults(data);
+  })
+  .catch(error => {
+    container.innerHTML = `<div class="p-6 text-center"><p class="text-red-500">Error loading recipes: ${error.message}</p></div>`;
+  });
+}
+
+// Render results from API
+function renderResults(data) {
+  const container = document.querySelector('.space-y-4');
+  const paginationContainer = document.getElementById('pagination-container');
+  const { recipes, total_pages, current_page } = data;
+  
+  if (recipes.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center"><p class="text-gray-500">No recipes found matching your criteria.</p></div>';
+    paginationContainer.innerHTML = '';
+    return;
+  }
+  
+  let html = '';
+  
+  // Render each recipe card
+  recipes.forEach(recipe => {
+    html += `
+    <div class="border rounded-lg p-4">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center">
+          ${recipe.photo ? `<img src="${recipe.photo}" alt="${recipe.title}" class="w-16 h-16 object-cover rounded mr-3">` : ''}
+          <div>
+            <h2 class="text-xl font-semibold">${recipe.title}</h2>
+          </div>
+        </div>
+        <div>
+          <button class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300" onclick="toggleDetails('details-${recipe.id}')">
+            Details
+          </button>
+        </div>
+      </div>
+      <div id="details-${recipe.id}" class="mt-4 hidden">
+        <p class="mb-2"><strong>Description:</strong> ${recipe.description}</p>
+        <p class="mb-2"><strong>Tags:</strong> ${recipe.tags.join(', ')}</p>
+        <p class="mb-2"><strong>Duration:</strong> ${recipe.duration} minutes</p>
+        
+        <!-- Ingredients -->
+        <div>
+          <strong>Ingredients:</strong>
+          <ul class="list-disc ml-6">
+            ${recipe.ingredients.map(ing => `
+              <li class="flex items-center mb-2">
+                ${ing.photo ? `<img src="${ing.photo}" alt="${ing.name}" class="w-10 h-10 object-cover rounded mr-3 flex-shrink-0">` : ''}
+                <div>
+                  <strong>${ing.name}</strong> 
+                  ${ing.quantity ? ` &mdash; Quantity: ${ing.quantity}` : ''}<br>
+                  Calories: ${ing.calories}, Fat: ${ing.fat}g,<br>
+                  Carbs: ${ing.carbohydrates}g, Protein: ${ing.protein}g<br>
+                  ${ing.allergens && ing.allergens.length ? `<span class="text-red-600"><em>Allergens:</em> ${ing.allergens.join(", ")}</span>` : ''}
+                </div>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+
+        <!-- Total Nutrition -->
+        <div class="mt-4 p-2 rounded bg-gray-100">
+          <strong>Total Nutrition:</strong>
+          <p>Calories: ${recipe.total_calories || 0}</p>
+          <p>Fat: ${recipe.total_fat || 0}g</p>
+          <p>Carbohydrates: ${recipe.total_carbohydrates || 0}g</p>
+          <p>Protein: ${recipe.total_protein || 0}g</p>
+        </div>
+        
+        <!-- Interaction buttons -->
+        <div class="flex flex-wrap gap-2 mt-4">
+          <!-- Like button -->
+          <button onclick="likeRecipe('${recipe.id}')" id="like-btn-${recipe.id}" class="${recipe.user_liked ? 'bg-green-500 text-white' : 'bg-green-100 text-green-800'} hover:bg-green-200 font-bold py-1 px-3 rounded">
+            👍 <span id="likes-count-${recipe.id}">${recipe.likes}</span>
+          </button>
+          
+          <!-- Dislike button -->
+          <button onclick="dislikeRecipe('${recipe.id}')" id="dislike-btn-${recipe.id}" class="${recipe.user_disliked ? 'bg-red-500 text-white' : 'bg-red-100 text-red-800'} hover:bg-red-200 font-bold py-1 px-3 rounded">
+            👎 <span id="dislikes-count-${recipe.id}">${recipe.dislikes}</span>
+          </button>
+          
+          <!-- Save button -->
+          <button onclick="saveRecipe('${recipe.id}')" id="save-btn-${recipe.id}" class="${recipe.user_saved ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-800'} hover:bg-blue-200 font-bold py-1 px-3 rounded">
+            <span id="save-text-${recipe.id}">
+              ${recipe.user_saved ? '⭐ Saved' : '☆ Save'}
+            </span>
+          </button>
+        </div>
+
+        <!-- Comment section -->
+        <div class="mt-4">
+          <strong>Comments:</strong>
+          <ul class="list-disc ml-6 mt-2">
+            ${recipe.comments && recipe.comments.length > 0 
+              ? recipe.comments.map(comment => `
+                <li class="flex items-start mb-1">
+                  ${comment.author_profile_picture 
+                    ? `<img src="${comment.author_profile_picture}" alt="${comment.author_username}" class="w-6 h-6 object-cover rounded-full mr-2 mt-0.5">`
+                    : `<div class="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center mr-2 mt-0.5 text-xs">${comment.author_username.charAt(0).toUpperCase()}</div>`
+                  }
+                  <div>
+                    <a href="/user/${comment.author_username}" class="font-medium hover:underline">${comment.author_username}:</a>
+                    <span>${comment.text}</span>
+                  </div>
+                </li>
+              `).join('')
+              : `<li class="text-gray-500">No comments yet</li>`
+            }
+          </ul>
+
+          <!-- Comment form -->
+          <form id="commentForm-${recipe.id}" onsubmit="submitComment(event, '${recipe.id}')" class="mt-2 flex space-x-2">
+            <input type="hidden" name="csrfmiddlewaretoken" value="${getCsrfToken()}">
+            <input type="text" name="comment" placeholder="Add a comment..." class="flex-grow px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+              Comment
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+  
+  // Update pagination
+  let paginationHTML = '';
+  if (total_pages > 1) {
+    paginationHTML = `
+      <div class="flex space-x-2">
+        ${current_page > 1 ? `
+          <button onclick="changePage(${current_page - 1})" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+            Previous
+          </button>
+        ` : ''}
+        
+        ${Array.from({length: total_pages}, (_, i) => i + 1).map(i => `
+          <button onclick="changePage(${i})" class="px-4 py-2 ${i === current_page ? 'bg-blue-500 text-white' : 'bg-gray-200'} rounded hover:bg-gray-300">
+            ${i}
+          </button>
+        `).join('')}
+        
+        ${current_page < total_pages ? `
+          <button onclick="changePage(${current_page + 1})" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+            Next
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
+  paginationContainer.innerHTML = paginationHTML;
+}
+
+function changePage(page) {
+  currentFilters.page = page;
+  fetchResults();
+  // Scroll to top of results
+  document.querySelector('.space-y-4').scrollIntoView({ behavior: 'smooth' });
+}
+
+// Like a recipe
+function likeRecipe(recipeId) {
+  const csrfToken = getCsrfToken();
+  
+  fetch('/recipe/' + recipeId + '/like', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Update like count
+      document.getElementById('likes-count-' + recipeId).textContent = data.likes;
+      
+      // Update button styling
+      const likeBtn = document.getElementById('like-btn-' + recipeId);
+      const dislikeBtn = document.getElementById('dislike-btn-' + recipeId);
+      const dislikeCount = document.getElementById('dislikes-count-' + recipeId);
+      
+      if (data.liked) {
+        likeBtn.classList.replace('bg-green-100', 'bg-green-500');
+        likeBtn.classList.replace('text-green-800', 'text-white');
+      } else {
+        likeBtn.classList.replace('bg-green-500', 'bg-green-100');
+        likeBtn.classList.replace('text-white', 'text-green-800');
+      }
+      
+      // If disliking was removed as a result of liking
+      if (data.dislike_removed) {
+        dislikeBtn.classList.replace('bg-red-500', 'bg-red-100');
+        dislikeBtn.classList.replace('text-white', 'text-red-800');
+        dislikeCount.textContent = data.dislikes;
+      }
+    } else {
+      if (data.error === 'login_required') {
+        window.location.href = '/login';
+      } else {
+        alert('Error: ' + (data.error || 'Something went wrong'));
+      }
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+}
+
+// Dislike a recipe
+function dislikeRecipe(recipeId) {
+  const csrfToken = getCsrfToken();
+  
+  fetch('/recipe/' + recipeId + '/dislike', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Update dislike count
+      document.getElementById('dislikes-count-' + recipeId).textContent = data.dislikes;
+      
+      // Update button styling
+      const dislikeBtn = document.getElementById('dislike-btn-' + recipeId);
+      const likeBtn = document.getElementById('like-btn-' + recipeId);
+      const likeCount = document.getElementById('likes-count-' + recipeId);
+      
+      if (data.disliked) {
+        dislikeBtn.classList.replace('bg-red-100', 'bg-red-500');
+        dislikeBtn.classList.replace('text-red-800', 'text-white');
+      } else {
+        dislikeBtn.classList.replace('bg-red-500', 'bg-red-100');
+        dislikeBtn.classList.replace('text-white', 'text-red-800');
+      }
+      
+      // If liking was removed as a result of disliking
+      if (data.like_removed) {
+        likeBtn.classList.replace('bg-green-500', 'bg-green-100');
+        likeBtn.classList.replace('text-white', 'text-green-800');
+        likeCount.textContent = data.likes;
+      }
+    } else {
+      if (data.error === 'login_required') {
+        window.location.href = '/login';
+      } else {
+        alert('Error: ' + (data.error || 'Something went wrong'));
+      }
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+}
+
+// Save a recipe
+function saveRecipe(recipeId) {
+  const csrfToken = getCsrfToken();
+  
+  fetch('/recipe/' + recipeId + '/save', {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    }
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Update button styling
+      const saveBtn = document.getElementById('save-btn-' + recipeId);
+      const saveText = document.getElementById('save-text-' + recipeId);
+      
+      if (data.saved) {
+        saveBtn.classList.replace('bg-blue-100', 'bg-blue-500');
+        saveBtn.classList.replace('text-blue-800', 'text-white');
+        saveText.innerHTML = '⭐ Saved';
+      } else {
+        saveBtn.classList.replace('bg-blue-500', 'bg-blue-100');
+        saveBtn.classList.replace('text-white', 'text-blue-800');
+        saveText.innerHTML = '☆ Save';
+      }
+    } else {
+      if (data.error === 'login_required') {
+        window.location.href = '/login';
+      } else {
+        alert('Error: ' + (data.error || 'Something went wrong'));
+      }
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+}
+
+// Submit a comment
+function submitComment(event, recipeId) {
+  event.preventDefault();
+  
+  const form = document.getElementById('commentForm-' + recipeId);
+  const commentInput = form.querySelector('input[name="comment"]');
+  const comment = commentInput.value.trim();
+  
+  if (!comment) return;
+  
+  // Get CSRF token
+  const csrfToken = form.querySelector('input[name="csrfmiddlewaretoken"]').value;
+  
+  // Create a request
+  fetch('/recipe/' + recipeId + '/comment', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRFToken': csrfToken,
+      'Accept': 'application/json'
+    },
+    body: 'comment=' + encodeURIComponent(comment)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Find the comments container and list
+      const detailsContainer = document.getElementById('details-' + recipeId);
+      
+      // Find the div containing the comments
+      const commentsDiv = Array.from(detailsContainer.querySelectorAll('div.mt-4'))
+        .find(div => div.querySelector('strong') && div.querySelector('strong').textContent === 'Comments:');
+      
+      if (commentsDiv) {
+        const commentsList = commentsDiv.querySelector('ul');
+        
+        // Remove "No comments yet" message if it exists
+        const noCommentsMsg = commentsList.querySelector('li.text-gray-500');
+        if (noCommentsMsg) {
+          noCommentsMsg.remove();
+        }
+        
+        // Add the new comment
+        const li = document.createElement('li');
+        li.className = 'flex items-start mb-1';
+        
+        // Create profile picture element
+        if (data.user_profile_picture) {
+          const img = document.createElement('img');
+          img.src = data.user_profile_picture;
+          img.alt = data.username;
+          img.className = 'w-6 h-6 object-cover rounded-full mr-2 mt-0.5';
+          li.appendChild(img);
+        } else {
+          const avatarDiv = document.createElement('div');
+          avatarDiv.className = 'w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center mr-2 mt-0.5 text-xs';
+          avatarDiv.textContent = data.username.charAt(0).toUpperCase();
+          li.appendChild(avatarDiv);
+        }
+        
+        // Add comment text with username
+        const commentDiv = document.createElement('div');
+        
+        const usernameLink = document.createElement('a');
+        usernameLink.href = '/user/' + data.username;
+        usernameLink.className = 'font-medium hover:underline';
+        usernameLink.textContent = data.username + ':';
+        commentDiv.appendChild(usernameLink);
+        
+        const textSpan = document.createElement('span');
+        textSpan.textContent = data.comment_text;
+        commentDiv.appendChild(textSpan);
+        
+        li.appendChild(commentDiv);
+        commentsList.appendChild(li);
+        
+        // Clear the input
+        commentInput.value = '';
+      }
+    } else {
+      if (data.error === 'login_required') {
+        window.location.href = '/login';
+      } else {
+        alert('Error: ' + (data.error || 'Something went wrong'));
+      }
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+}
+
+    function toggleFollow(username) {
+      const csrfToken = getCsrfToken();
+      
+      fetch(`/user/${username}/follow`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrfToken,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          const followBtn = document.getElementById('follow-button');
+          const followersCount = document.getElementById('followers-count');
+          
+          followersCount.textContent = data.followers_count;
+          
+          if (data.followed) {
+            followBtn.textContent = 'Unfollow';
+            followBtn.classList.remove('bg-blue-500', 'text-white', 'hover:bg-blue-600');
+            followBtn.classList.add('bg-gray-200', 'hover:bg-gray-300');
+          } else {
+            followBtn.textContent = 'Follow';
+            followBtn.classList.remove('bg-gray-200', 'hover:bg-gray-300');
+            followBtn.classList.add('bg-blue-500', 'text-white', 'hover:bg-blue-600');
+          }
+        } else {
+          if (data.error === 'login_required') {
+            window.location.href = '/login';
+          } else {
+            alert('Error: ' + (data.error || 'Something went wrong'));
+          }
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    }
+    
+    function getCsrfToken() {
+      const name = 'csrftoken';
+      let cookieValue = null;
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+            break;
+          }
+        }
+      }
+      return cookieValue;
+    }
+        </script>
+    {% endblock %}

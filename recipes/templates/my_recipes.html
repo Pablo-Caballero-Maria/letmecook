@@ -2,277 +2,735 @@
 {% load recipe_filters %}
 {% block title %}My Recipes - Let Me Cook{% endblock %}
 {% block content %}
-  {% if error %}
-  <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
-    <span class="block sm:inline">{{ error }}</span>
-  </div>
-  {% endif %}
-
-  {% if success %}
-  <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4" role="alert">
-    <span class="block sm:inline">{{ success }}</span>
-  </div>
-  {% endif %}
-  <div class="max-w-7xl mx-auto py-8 px-4">
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold">My Recipes</h1>
-      <button onclick="openModal('createModal')" class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">
-        Create New Recipe
-      </button>
+    {% if error %}
+        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4"
+             role="alert">
+            <span class="block sm:inline">{{ error }}</span>
+        </div>
+    {% endif %}
+    {% if success %}
+        <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mb-4"
+             role="alert">
+            <span class="block sm:inline">{{ success }}</span>
+        </div>
+    {% endif %}
+    <div class="max-w-7xl mx-auto py-8 px-4">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold">My Recipes</h1>
+            <button onclick="openModal('createModal')"
+                    class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700">Create New Recipe</button>
+        </div>
+        <!-- Search, Filter and Sort Controls -->
+        <div class="mb-6">
+            <!-- Search form -->
+            <div class="mb-4">
+                <div class="flex space-x-2">
+                    <input type="text"
+                           id="searchInput"
+                           placeholder="Search recipes, ingredients, or tags..."
+                           class="flex-grow px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button id="searchButton"
+                            type="button"
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Search</button>
+                </div>
+            </div>
+            <!-- Controls row -->
+            <div class="flex flex-wrap items-end gap-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Filter by Tag</label>
+                    <button id="tagFilterButton"
+                            onclick="openTagModal()"
+                            class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded border h-10">
+                        Select Tags <span class="ml-1">▼</span>
+                    </button>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Sort by</label>
+                    <select id="sortBy" class="border rounded px-4 py-2 h-10">
+                        <option value="newest">Newest</option>
+                        <option value="likes">Most Liked</option>
+                        <option value="duration-asc">Duration (shortest first)</option>
+                        <option value="duration-desc">Duration (longest first)</option>
+                    </select>
+                </div>
+            </div>
+            <!-- Tags badges row -->
+            <div id="selectedTagsBadges" class="flex flex-wrap gap-2 mt-2">
+                <!-- Selected tag badges will appear here -->
+            </div>
+        </div>
+        <div class="space-y-4">
+            {% for recipe in recipes %}
+                <div class="border rounded-lg p-4">
+                    <div class="flex justify-between items-center">
+                        <div class="flex items-center">
+                            {% if recipe.photo %}
+                                <img src="{{ recipe.photo }}"
+                                     alt="{{ recipe.title }}"
+                                     class="w-16 h-16 object-cover rounded mr-3">
+                            {% endif %}
+                            <h2 class="text-xl font-semibold">{{ recipe.title }}</h2>
+                        </div>
+                        <div class="space-x-2">
+                            <button class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                                    onclick="toggleDetails('details-{{ recipe.id }}')">Details</button>
+                            <button onclick="openModal('updateModal-{{ recipe.id }}')"
+                                    class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">Update</button>
+                            <button onclick="confirmDelete('/recipe/delete/{{ recipe.id }}')"
+                                    class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
+                        </div>
+                    </div>
+                    <div id="details-{{ recipe.id }}" class="mt-4 hidden">
+                        <p class="mb-2">
+                            <strong>Description:</strong> {{ recipe.description }}
+                        </p>
+                        <p class="mb-2">
+                            <strong>Tags:</strong> {{ recipe.tags|join:", " }}
+                        </p>
+                        <p class="mb-2">
+                            <strong>Duration:</strong> {{ recipe.duration }} minutes
+                        </p>
+                        <div>
+                            <strong>Ingredients:</strong>
+                            <ul class="list-disc ml-6">
+                                {% for ingredient in recipe.ingredients %}
+                                    <li class="flex items-center mb-2">
+                                        {% if ingredient.photo %}
+                                            <img src="{{ ingredient.photo }}"
+                                                 alt="{{ ingredient.name }}"
+                                                 class="w-10 h-10 object-cover rounded mr-3 flex-shrink-0">
+                                        {% endif %}
+                                        <div>
+                                            <strong>{{ ingredient.name }}</strong>
+                                            {% if ingredient.quantity %}&mdash; Quantity: {{ ingredient.quantity }}{% endif %}
+                                            <br>
+                                            Calories: {{ ingredient.calories }}, Fat: {{ ingredient.fat }}g,
+                                            <br>
+                                            Carbs: {{ ingredient.carbohydrates }}g, Protein: {{ ingredient.protein }}g
+                                            <br>
+                                            {% if ingredient.allergens %}
+                                                <span class="text-red-600"><em>Allergens:</em> {{ ingredient.allergens|join:", " }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <!-- Total nutritional summary (assumed computed on the model or in view) -->
+                        <div class="mt-4 p-2 rounded bg-gray-100">
+                            <strong>Total Nutrition:</strong>
+                            <p>Calories: {{ recipe.total_calories }}</p>
+                            <p>Fat: {{ recipe.total_fat }}</p>
+                            <p>Carbohydrates: {{ recipe.total_carbohydrates }}</p>
+                            <p>Protein: {{ recipe.total_protein }}</p>
+                        </div>
+                        <!-- Interaction buttons -->
+                        <div class="flex flex-wrap gap-2 mt-4">
+                            <!-- Like button -->
+                            <button onclick="likeRecipe('{{ recipe.id }}')"
+                                    id="like-btn-{{ recipe.id }}"
+                                    class="{% if current_user in recipe.liked_by %}bg-green-500 text-white{% else %}bg-green-100 text-green-800{% endif %} hover:bg-green-200 font-bold py-1 px-3 rounded">
+                                👍 <span id="likes-count-{{ recipe.id }}">{{ recipe.likes }}</span>
+                            </button>
+                            <!-- Dislike button -->
+                            <button onclick="dislikeRecipe('{{ recipe.id }}')"
+                                    id="dislike-btn-{{ recipe.id }}"
+                                    class="{% if current_user in recipe.disliked_by %}bg-red-500 text-white{% else %}bg-red-100 text-red-800{% endif %} hover:bg-red-200 font-bold py-1 px-3 rounded">
+                                👎 <span id="dislikes-count-{{ recipe.id }}">{{ recipe.dislikes }}</span>
+                            </button>
+                            <!-- Save button -->
+                            <button onclick="saveRecipe('{{ recipe.id }}')"
+                                    id="save-btn-{{ recipe.id }}"
+                                    class="{% if recipe in current_user.saved_recipes %}bg-blue-500 text-white{% else %}bg-blue-100 text-blue-800{% endif %} hover:bg-blue-200 font-bold py-1 px-3 rounded">
+                                <span id="save-text-{{ recipe.id }}">
+                                    {% if recipe in current_user.saved_recipes %}
+                                        ⭐ Saved
+                                    {% else %}
+                                        ☆ Save
+                                    {% endif %}
+                                </span>
+                            </button>
+                        </div>
+                        <div class="mt-4 p-2 rounded bg-gray-50">
+                            <strong>Comments:</strong>
+                            <ul class="list-disc ml-6 mt-2 comments-list">
+                                {% for comment in recipe.comments %}
+                                    <li class="flex items-start mb-1">
+                                        <img src="{{ comment.author.profile_picture }}"
+                                             alt="{{ comment.author.username }}"
+                                             class="w-6 h-6 object-cover rounded-full mr-2 mt-0.5">
+                                        <div>
+                                            <a href="/user/{{ comment.author.username }}"
+                                               class="font-medium hover:underline">{{ comment.author.username }}:</a>
+                                            <span>{{ comment.text }}</span>
+                                        </div>
+                                    </li>
+                                {% empty %}
+                                    <li class="text-gray-500">No comments yet</li>
+                                {% endfor %}
+                            </ul>
+                            <!-- Comment form -->
+                            <form id="commentForm-{{ recipe.id }}"
+                                  onsubmit="submitComment(event, '{{ recipe.id }}')"
+                                  class="mt-2 flex space-x-2">
+                                {% csrf_token %}
+                                <input type="text"
+                                       name="comment"
+                                       placeholder="Add a comment..."
+                                       class="flex-grow px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <button type="submit"
+                                        class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                    Comment
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <!-- Update Recipe Modal -->
+                <div id="updateModal-{{ recipe.id }}"
+                     class="fixed inset-0 z-50 hidden overflow-y-auto">
+                    <div class="flex min-h-full items-center justify-center p-4">
+                        <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg relative max-h-[90vh] overflow-y-auto">
+                            <button onclick="closeModal('updateModal-{{ recipe.id }}')"
+                                    class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
+                            <h2 class="text-2xl font-bold mb-4">Update Recipe</h2>
+                            <form action="/recipe/update/{{ recipe.id }}"
+                                  method="POST"
+                                  enctype="multipart/form-data">
+                                {% csrf_token %}
+                                <div class="mb-4">
+                                    <label class="block">Title</label>
+                                    <input name="title"
+                                           type="text"
+                                           value="{{ recipe.title }}"
+                                           class="border rounded w-full p-2">
+                                </div>
+                                <div class="mb-4">
+                                    <label class="block">Recipe Photo</label>
+                                    <input type="file"
+                                           name="photo"
+                                           accept="image/*"
+                                           class="border rounded w-full p-2 mb-2"
+                                           onchange="previewImage(this, 'recipeImagePreview-{{ recipe.id }}')">
+                                    <div id="recipeImagePreview-{{ recipe.id }}"
+                                         class="mt-2"
+                                         data-original="{{ recipe.photo }}">
+                                        {% if recipe.photo %}
+                                            <img src="{{ recipe.photo }}"
+                                                 alt="{{ recipe.title }}"
+                                                 class="h-20 w-auto object-cover rounded">
+                                        {% endif %}
+                                    </div>
+                                    <label class="block">Description</label>
+                                    <textarea name="description" class="border rounded w-full p-2">{{ recipe.description }}</textarea>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="block">Tags</label>
+                                    <div id="tagsContainer-{{ recipe.id }}">
+                                        {% for tag in recipe.tags %}
+                                            <div class="flex items-center space-x-2 mb-2">
+                                                <input type="text" name="tags" value="{{ tag }}" class="border rounded p-1">
+                                                <button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    <select onchange="addTag(this, 'tagsContainer-{{ recipe.id }}')"
+                                            class="border rounded p-1">
+                                        <option value="">Add tag</option>
+                                        {% for tag in tags %}<option value="{{ tag }}">{{ tag }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="block">Ingredients (choose and set quantity)</label>
+                                    <div id="ingredientsContainer-{{ recipe.id }}">
+                                        {% for ingredient in recipe.ingredients %}
+                                            <div class="flex items-center space-x-2 mb-2">
+                                                {% if ingredient.photo %}
+                                                    <img src="{{ ingredient.photo }}"
+                                                         alt="{{ ingredient.name }}"
+                                                         class="w-10 h-10 object-cover rounded">
+                                                {% endif %}
+                                                <input type="text"
+                                                       name="ingredients"
+                                                       value="{{ ingredient.name }}"
+                                                       class="border rounded p-1"
+                                                       readonly>
+                                                <input type="hidden"
+                                                       name="ingredient_photos"
+                                                       value="{{ ingredient.photo|default:'' }}">
+                                                <input type="number"
+                                                       name="quantities"
+                                                       value="{{ ingredient.quantity|default:'1' }}"
+                                                       min="1"
+                                                       placeholder="Quantity"
+                                                       class="border rounded p-1 w-24">
+                                                <button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                    <select onchange="addIngredient(this, 'ingredientsContainer-{{ recipe.id }}')"
+                                            class="border rounded p-1">
+                                        <option value="">Add ingredient</option>
+                                        {% for ingredient in ingredients %}
+                                            <option value="{{ ingredient.name }}||{{ ingredient.calories }}||{{ ingredient.fat }}||{{ ingredient.carbohydrates }}||{{ ingredient.protein }}||{{ ingredient.allergens|join:';' }}||{{ ingredient.photo|default:'' }}">
+                                                {{ ingredient.name }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="block">Duration (minutes)</label>
+                                    <input name="duration"
+                                           type="number"
+                                           value="{{ recipe.duration }}"
+                                           min="1"
+                                           class="border rounded w-full p-2">
+                                </div>
+                                <div class="text-right">
+                                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
     </div>
-
-    <div class="space-y-4">
-      {% for recipe in recipes %}
-      <div class="border rounded-lg p-4">
-        <div class="flex justify-between items-center">
-          <div class="flex items-center">
-            {% if recipe.photo %}
-              <img src="{{ recipe.photo }}" alt="{{ recipe.title }}" class="w-16 h-16 object-cover rounded mr-3">
-            {% endif %}
-            <h2 class="text-xl font-semibold">{{ recipe.title }}</h2>
-          </div>
-          <div class="space-x-2">
-            <button class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300" onclick="toggleDetails('details-{{ recipe.id }}')">
-              Details
-            </button>
-            <button onclick="openModal('updateModal-{{ recipe.id }}')" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
-              Update
-            </button>
-            <button onclick="confirmDelete('/recipe/delete/{{ recipe.id }}')" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">
-              Delete
-            </button>
-          </div>
-        </div>
-
-
-        <div id="details-{{ recipe.id }}" class="mt-4 hidden">
-          <p class="mb-2"><strong>Description:</strong> {{ recipe.description }}</p>
-          <p class="mb-2"><strong>Tags:</strong> {{ recipe.tags|join:", " }}</p>
-          <p class="mb-2"><strong>Duration:</strong> {{ recipe.duration }} minutes</p>
-          <div>
-            <strong>Ingredients:</strong>
-            <ul class="list-disc ml-6">
-              {% for ingredient in recipe.ingredients %}
-              <li class="flex items-center mb-2">
-                {% if ingredient.photo %}
-                  <img src="{{ ingredient.photo }}" alt="{{ ingredient.name }}" class="w-10 h-10 object-cover rounded mr-3 flex-shrink-0">
-                {% endif %}
-                <div>
-                  <strong>{{ ingredient.name }}</strong> 
-                  {% if ingredient.quantity %} &mdash; Quantity: {{ ingredient.quantity }}{% endif %}<br>
-                  Calories: {{ ingredient.calories }}, Fat: {{ ingredient.fat }}g,<br>
-                  Carbs: {{ ingredient.carbohydrates }}g, Protein: {{ ingredient.protein }}g<br>
-                  {% if ingredient.allergens %}
-                    <span class="text-red-600"><em>Allergens:</em> {{ ingredient.allergens|join:", " }}</span>
-                  {% endif %}
-                </div>
-              </li>
-              {% endfor %}
-            </ul>
-          </div>
-          <!-- Total nutritional summary (assumed computed on the model or in view) -->
-          <div class="mt-4 p-2 rounded bg-gray-100">
-            <strong>Total Nutrition:</strong>
-            <p>Calories: {{ recipe.total_calories }}</p>
-            <p>Fat: {{ recipe.total_fat }}</p>
-            <p>Carbohydrates: {{ recipe.total_carbohydrates }}</p>
-            <p>Protein: {{ recipe.total_protein }}</p>
-          </div>
-<!-- Interaction buttons -->
-<div class="flex flex-wrap gap-2 mt-4">
-  <!-- Like button -->
-  <button onclick="likeRecipe('{{ recipe.id }}')" 
-    id="like-btn-{{ recipe.id }}"
-    class="{% if current_user in recipe.liked_by %}bg-green-500 text-white{% else %}bg-green-100 text-green-800{% endif %} hover:bg-green-200 font-bold py-1 px-3 rounded">
-    👍 <span id="likes-count-{{ recipe.id }}">{{ recipe.likes }}</span>
-  </button>
-  
-  <!-- Dislike button -->
-  <button onclick="dislikeRecipe('{{ recipe.id }}')"
-    id="dislike-btn-{{ recipe.id }}"
-    class="{% if current_user in recipe.disliked_by %}bg-red-500 text-white{% else %}bg-red-100 text-red-800{% endif %} hover:bg-red-200 font-bold py-1 px-3 rounded">
-    👎 <span id="dislikes-count-{{ recipe.id }}">{{ recipe.dislikes }}</span>
-  </button>
-  
-  <!-- Save button -->
-  <button onclick="saveRecipe('{{ recipe.id }}')"
-    id="save-btn-{{ recipe.id }}"
-    class="{% if recipe in current_user.saved_recipes %}bg-blue-500 text-white{% else %}bg-blue-100 text-blue-800{% endif %} hover:bg-blue-200 font-bold py-1 px-3 rounded">
-    <span id="save-text-{{ recipe.id }}">
-      {% if recipe in current_user.saved_recipes %}
-        ⭐ Saved
-      {% else %}
-        ☆ Save
-      {% endif %}
-    </span>
-  </button>
-</div>
-          <div class="mt-4 p-2 rounded bg-gray-50">
-            <strong>Comments:</strong>
-            <ul class="list-disc ml-6 mt-2 comments-list">
-              {% for comment in recipe.comments %}
-              <li class="flex items-start mb-1">
-                  <img src="{{ comment.author.profile_picture }}" alt="{{ comment.author.username }}" class="w-6 h-6 object-cover rounded-full mr-2 mt-0.5">
-
-                <div>
-                  <span class="font-medium">{{ comment.author.username }}:</span>
-                  <span>{{ comment.text }}</span>
-                </div>
-              </li>
-              {% empty %}
-              <li class="text-gray-500">No comments yet</li>
-              {% endfor %}
-            </ul>
-
-            <!-- Comment form -->
-            <form id="commentForm-{{ recipe.id }}" onsubmit="submitComment(event, '{{ recipe.id }}')" class="mt-2 flex space-x-2">
-              {% csrf_token %}
-              <input type="text" name="comment" placeholder="Add a comment..." class="flex-grow px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
-                Comment
-              </button>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      <!-- Update Recipe Modal -->
-      <div id="updateModal-{{ recipe.id }}" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <!-- Create Recipe Modal -->
+    <div id="createModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
         <div class="flex min-h-full items-center justify-center p-4">
-          <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg relative max-h-[90vh] overflow-y-auto">
-            <button onclick="closeModal('updateModal-{{ recipe.id }}')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
-            <h2 class="text-2xl font-bold mb-4">Update Recipe</h2>
-            <form action="/recipe/update/{{ recipe.id }}" method="POST" enctype="multipart/form-data">              
-              {% csrf_token %}
-              <div class="mb-4">
-                <label class="block">Title</label>
-                <input name="title" type="text" value="{{ recipe.title }}" class="border rounded w-full p-2">
-              </div>
-              <div class="mb-4">
-                  <label class="block">Recipe Photo</label>
-                  <input type="file" name="photo" accept="image/*" class="border rounded w-full p-2 mb-2" onchange="previewImage(this, 'recipeImagePreview-{{ recipe.id }}')">
-                  <div id="recipeImagePreview-{{ recipe.id }}" class="mt-2" data-original="{{ recipe.photo }}">
-                    {% if recipe.photo %}
-                      <img src="{{ recipe.photo }}" alt="{{ recipe.title }}" class="h-20 w-auto object-cover rounded">
-                    {% endif %}
-                  </div>      
-                <label class="block">Description</label>
-                <textarea name="description" class="border rounded w-full p-2">{{ recipe.description }}</textarea>
-              </div>
-              <div class="mb-4">
-                <label class="block">Tags</label>
-                <div id="tagsContainer-{{ recipe.id }}">
-                  {% for tag in recipe.tags %}
-                  <div class="flex items-center space-x-2 mb-2">
-                    <input type="text" name="tags" value="{{ tag }}" class="border rounded p-1">
-                    <button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>
-                  </div>
-                  {% endfor %}
-                </div>
-                <select onchange="addTag(this, 'tagsContainer-{{ recipe.id }}')" class="border rounded p-1">
-                  <option value="">Add tag</option>
-                  {% for tag in tags %}
-                  <option value="{{ tag }}">{{ tag }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-      <div class="mb-4">
-        <label class="block">Ingredients (choose and set quantity)</label>
-        <div id="ingredientsContainer-{{ recipe.id }}">
-          {% for ingredient in recipe.ingredients %}
-          <div class="flex items-center space-x-2 mb-2">
-            {% if ingredient.photo %}
-              <img src="{{ ingredient.photo }}" alt="{{ ingredient.name }}" class="w-10 h-10 object-cover rounded">
-            {% endif %}
-            <input type="text" name="ingredients" value="{{ ingredient.name }}" class="border rounded p-1" readonly>
-            <input type="hidden" name="ingredient_photos" value="{{ ingredient.photo|default:'' }}">
-            <input type="number" name="quantities" value="{{ ingredient.quantity|default:'1' }}" min="1" placeholder="Quantity" class="border rounded p-1 w-24">
-            <button type="button" onclick="removeElement(this)" class="text-red-600">Remove</button>
-          </div>
-          {% endfor %}
+            <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg relative max-h-[90vh] overflow-y-auto">
+                <button onclick="closeModal('createModal')"
+                        class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
+                <h2 class="text-2xl font-bold mb-4">Create New Recipe</h2>
+                <form action="/recipe/new"
+                      method="POST"
+                      enctype="multipart/form-data"
+                      onsubmit="return validateRecipeForm(this)">
+                    {% csrf_token %}
+                    <div class="mb-4">
+                        <label class="block">Title</label>
+                        <input name="title"
+                               type="text"
+                               placeholder="Recipe title"
+                               class="border rounded w-full p-2">
+                        <span class="text-red-500 text-sm hidden error-message" id="title-error">Title is required</span>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block">Recipe Photo</label>
+                        <input type="file"
+                               name="photo"
+                               accept="image/*"
+                               class="border rounded w-full p-2"
+                               onchange="previewImage(this, 'recipeImagePreview')">
+                        <div id="recipeImagePreview" class="mt-2"></div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block">Description</label>
+                        <textarea name="description"
+                                  placeholder="Description"
+                                  class="border rounded w-full p-2"></textarea>
+                        <span class="text-red-500 text-sm hidden error-message"
+                              id="description-error">Description is required</span>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block">Tags</label>
+                        <div id="newTagsContainer"></div>
+                        <select onchange="addTag(this, 'newTagsContainer')"
+                                class="border rounded p-1">
+                            <option value="">Add tag</option>
+                            {% for tag in tags %}<option value="{{ tag }}">{{ tag }}</option>{% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block">Ingredients (choose and set quantity)</label>
+                        <div id="newIngredientsContainer"></div>
+                        <select onchange="addIngredient(this, 'newIngredientsContainer')"
+                                class="border rounded p-1">
+                            <option value="">Add ingredient</option>
+                            {% for ingredient in ingredients %}
+                                <option value="{{ ingredient.name }}||{{ ingredient.calories }}||{{ ingredient.fat }}||{{ ingredient.carbohydrates }}||{{ ingredient.protein }}||{{ ingredient.allergens|join:';' }}||{{ ingredient.photo }}">
+                                    {{ ingredient.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <span class="text-red-500 text-sm hidden error-message"
+                              id="ingredients-error">At least one ingredient is required</span>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block">Duration (minutes)</label>
+                        <input name="duration"
+                               type="number"
+                               min="1"
+                               placeholder="Duration"
+                               class="border rounded w-full p-2">
+                        <span class="text-red-500 text-sm hidden error-message" id="duration-error">Duration is required</span>
+                    </div>
+                    <div class="text-right">
+                        <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">Create Recipe</button>
+                    </div>
+                </form>
+            </div>
         </div>
-        <select onchange="addIngredient(this, 'ingredientsContainer-{{ recipe.id }}')" class="border rounded p-1">
-          <option value="">Add ingredient</option>
-          {% for ingredient in ingredients %}
-          <option value="{{ ingredient.name }}||{{ ingredient.calories }}||{{ ingredient.fat }}||{{ ingredient.carbohydrates }}||{{ ingredient.protein }}||{{ ingredient.allergens|join:';' }}||{{ ingredient.photo|default:'' }}">{{ ingredient.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-              <div class="mb-4">
-                <label class="block">Duration (minutes)</label>
-                <input name="duration" type="number" value="{{ recipe.duration }}" min="1" class="border rounded w-full p-2">
-              </div>
-              <div class="text-right">
-                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-      {% endfor %}
     </div>
-  </div>
+</div>
+<!-- JavaScript for modals and dynamic fields -->
+<script>
+    // Store filters and current state
+let currentFilters = {
+  query: '',
+  tags: [],
+  sort: 'newest',
+  page: 1
+};
 
-  <!-- Create Recipe Modal -->
-  <div id="createModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
-    <div class="flex min-h-full items-center justify-center p-4">
-      <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg relative max-h-[90vh] overflow-y-auto">
-        <button onclick="closeModal('createModal')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
-        <h2 class="text-2xl font-bold mb-4">Create New Recipe</h2>
-        <form action="/recipe/new" method="POST" enctype="multipart/form-data" onsubmit="return validateRecipeForm(this)">
-          {% csrf_token %}
-          <div class="mb-4">
-            <label class="block">Title</label>
-            <input name="title" type="text" placeholder="Recipe title" class="border rounded w-full p-2">
-            <span class="text-red-500 text-sm hidden error-message" id="title-error">Title is required</span>
+let tempSelectedTags = [];
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize filter values from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('q')) {
+    document.getElementById('searchInput').value = urlParams.get('q');
+    currentFilters.query = urlParams.get('q');
+  }
+  if (urlParams.has('sort')) {
+    currentFilters.sort = urlParams.get('sort');
+    document.getElementById('sortBy').value = currentFilters.sort;
+  }
+  if (urlParams.has('tag')) {
+    const tags = urlParams.get('tag').split(',');
+    currentFilters.tags = tags;
+    renderSelectedTagBadges();
+  }
+  
+  // Setup event listeners
+  document.getElementById('searchInput').addEventListener('input', debounce(function() {
+    currentFilters.query = this.value;
+    currentFilters.page = 1;
+    fetchResults();
+  }, 500));
+  
+  document.getElementById('searchButton').addEventListener('click', function() {
+    currentFilters.query = document.getElementById('searchInput').value;
+    currentFilters.page = 1;
+    fetchResults();
+  });
+  
+  document.getElementById('sortBy').addEventListener('change', function() {
+    currentFilters.sort = this.value;
+    currentFilters.page = 1;
+    fetchResults();
+  });
+  
+  // Load all available tags for the modal
+  loadAllTags();
+});
+
+// Debounce function for search
+function debounce(func, delay) {
+  let timeout;
+  return function() {
+    const context = this;
+    const args = arguments;
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(context, args), delay);
+  };
+}
+
+// Tag Modal Functions
+function openTagModal() {
+  tempSelectedTags = [...currentFilters.tags];
+  document.getElementById('tagModal').classList.remove('hidden');
+  renderTagModal();
+}
+
+function closeTagModal() {
+  document.getElementById('tagModal').classList.add('hidden');
+  tempSelectedTags = [...currentFilters.tags];
+}
+
+function loadAllTags() {
+  // Fetch all available tags from server
+  fetch('/api/tags')
+    .then(response => response.json())
+    .then(data => {
+      window.allTags = data.tags;
+      renderTagModal();
+    })
+    .catch(error => {
+      console.error("Error loading tags:", error);
+    });
+}
+
+function renderTagModal() {
+  if (!window.allTags) return;
+  
+  const availableTagsContainer = document.getElementById('availableTagsContainer');
+  const selectedTagsContainer = document.getElementById('selectedTagsContainer');
+  
+  // Clear containers
+  availableTagsContainer.innerHTML = '';
+  selectedTagsContainer.innerHTML = '';
+  
+  // Add selected tags
+  tempSelectedTags.forEach(tag => {
+    const tagEl = document.createElement('div');
+    tagEl.className = 'px-3 py-1 bg-blue-100 text-blue-800 rounded flex items-center';
+    tagEl.innerHTML = `
+      ${tag}
+      <button onclick="removeModalTag('${tag}')" class="ml-2 text-blue-500 hover:text-blue-700">&times;</button>
+    `;
+    selectedTagsContainer.appendChild(tagEl);
+  });
+  
+  // Add available tags that aren't selected
+  if (window.allTags && window.allTags.length > 0) {
+    window.allTags.filter(tag => !tempSelectedTags.includes(tag)).forEach(tag => {
+      const tagEl = document.createElement('div');
+      tagEl.className = 'px-3 py-1 bg-gray-100 text-gray-800 rounded cursor-pointer hover:bg-gray-200';
+      tagEl.textContent = tag;
+      tagEl.onclick = function() { addModalTag(tag); };
+      availableTagsContainer.appendChild(tagEl);
+    });
+  }
+}
+
+function renderSelectedTagBadges() {
+  const badgesContainer = document.getElementById('selectedTagsBadges');
+  badgesContainer.innerHTML = '';
+  
+  currentFilters.tags.forEach(tag => {
+    const badge = document.createElement('div');
+    badge.className = 'px-3 py-1 bg-blue-100 text-blue-800 rounded flex items-center';
+    badge.innerHTML = `
+      ${tag}
+      <button onclick="removeTag('${tag}')" class="ml-2 text-blue-500 hover:text-blue-700">&times;</button>
+    `;
+    badgesContainer.appendChild(badge);
+  });
+}
+
+function addModalTag(tag) {
+  if (!tempSelectedTags.includes(tag)) {
+    tempSelectedTags.push(tag);
+    renderTagModal();
+  }
+}
+
+function removeModalTag(tag) {
+  tempSelectedTags = tempSelectedTags.filter(t => t !== tag);
+  renderTagModal();
+}
+
+function removeTag(tag) {
+  currentFilters.tags = currentFilters.tags.filter(t => t !== tag);
+  renderSelectedTagBadges();
+  fetchResults();
+}
+
+function applyTagFilters() {
+  currentFilters.tags = [...tempSelectedTags]; // Apply temporary selections
+  closeTagModal();
+  renderSelectedTagBadges();
+  currentFilters.page = 1;
+  fetchResults();
+}
+
+// Fetch and render results
+function fetchResults() {
+  // Show loading state
+  const container = document.querySelector('.space-y-4');
+  container.innerHTML = '<div class="text-center py-8"><span class="animate-spin inline-block h-6 w-6 border-t-2 border-blue-500 rounded-full"></span><span class="ml-2">Loading...</span></div>';
+  
+  // Update URL to reflect current filters (for bookmarking/sharing)
+  const url = new URL(window.location);
+  
+  if (currentFilters.query) url.searchParams.set('q', currentFilters.query);
+  else url.searchParams.delete('q');
+  
+  if (currentFilters.tags.length > 0) url.searchParams.set('tag', currentFilters.tags.join(','));
+  else url.searchParams.delete('tag');
+  
+  url.searchParams.set('sort', currentFilters.sort);
+  url.searchParams.set('page', currentFilters.page);
+  
+  // Update URL without reload
+  window.history.replaceState({}, '', url);
+  
+  // Fetch filtered results
+  fetch(`/api/recipes?${new URLSearchParams({
+    q: currentFilters.query,
+    tags: currentFilters.tags.join(','),
+    sort: currentFilters.sort,
+    page: currentFilters.page,
+    my_recipes: 'true'  // Add this parameter to filter for user's own recipes
+  })}`)
+  .then(response => response.json())
+  .then(data => {
+    renderResults(data)
+  })
+  .catch(error => {
+    container.innerHTML = `<div class="p-6 text-center"><p class="text-red-500">Error loading recipes: ${error.message}</p></div>`;
+  });
+}
+
+  // Render results from API
+function renderResults(data) {
+  const container = document.querySelector('.space-y-4');
+  const paginationContainer = document.querySelector('.mt-8.flex.justify-center');
+  const { recipes, total_pages, current_page } = data;
+  
+  if (recipes.length === 0) {
+    container.innerHTML = '<div class="p-6 text-center"><p class="text-gray-500">No recipes found matching your criteria.</p></div>';
+    paginationContainer.innerHTML = '';
+    return;
+  }
+  
+  let html = '';
+  
+  // Render each recipe card
+  recipes.forEach(recipe => {
+    html += `
+    <div class="border rounded-lg p-4">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center">
+          ${recipe.photo ? `<img src="${recipe.photo}" alt="${recipe.title}" class="w-16 h-16 object-cover rounded mr-3">` : ''}
+          <div>
+            <h2 class="text-xl font-semibold">${recipe.title}</h2>
           </div>
-          <div class="mb-4">
-            <label class="block">Recipe Photo</label>
-            <input type="file" name="photo" accept="image/*" class="border rounded w-full p-2" onchange="previewImage(this, 'recipeImagePreview')">
-            <div id="recipeImagePreview" class="mt-2"></div>
-          </div>
-          <div class="mb-4">
-            <label class="block">Description</label>
-            <textarea name="description" placeholder="Description" class="border rounded w-full p-2"></textarea>
-            <span class="text-red-500 text-sm hidden error-message" id="description-error">Description is required</span>
-          </div>
-          <div class="mb-4">
-            <label class="block">Tags</label>
-            <div id="newTagsContainer"></div>
-            <select onchange="addTag(this, 'newTagsContainer')" class="border rounded p-1">
-              <option value="">Add tag</option>
-              {% for tag in tags %}
-              <option value="{{ tag }}">{{ tag }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="mb-4">
-            <label class="block">Ingredients (choose and set quantity)</label>
-            <div id="newIngredientsContainer"></div>
-            <select onchange="addIngredient(this, 'newIngredientsContainer')" class="border rounded p-1">
-              <option value="">Add ingredient</option>
-              {% for ingredient in ingredients %}
-              <option value="{{ ingredient.name }}||{{ ingredient.calories }}||{{ ingredient.fat }}||{{ ingredient.carbohydrates }}||{{ ingredient.protein }}||{{ ingredient.allergens|join:';' }}||{{ ingredient.photo }}">{{ ingredient.name }}</option>
-              {% endfor %}
-            </select>
-            <span class="text-red-500 text-sm hidden error-message" id="ingredients-error">At least one ingredient is required</span>
-          </div>
-          <div class="mb-4">
-            <label class="block">Duration (minutes)</label>
-            <input name="duration" type="number" min="1" placeholder="Duration" class="border rounded w-full p-2">
-            <span class="text-red-500 text-sm hidden error-message" id="duration-error">Duration is required</span>
-          </div>
-          <div class="text-right">
-            <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded">Create Recipe</button>
-          </div>
-        </form>
+        </div>
+        <div class="space-x-2">
+          <button class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300" onclick="toggleDetails('details-${recipe.id}')">
+            Details
+          </button>
+          <button onclick="openModal('updateModal-${recipe.id}')" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+            Update
+          </button>
+          <button onclick="confirmDelete('/recipe/delete/${recipe.id}')" class="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700">
+            Delete
+          </button>
+        </div>
       </div>
-    </div> 
-  </div>
-  </div>
+      <div id="details-${recipe.id}" class="mt-4 hidden">
+        <p class="mb-2"><strong>Description:</strong> ${recipe.description}</p>
+        <p class="mb-2"><strong>Tags:</strong> ${recipe.tags.join(', ')}</p>
+        <p class="mb-2"><strong>Duration:</strong> ${recipe.duration} minutes</p>
+        <div>
+          <strong>Ingredients:</strong>
+          <ul class="list-disc ml-6">
+            ${recipe.ingredients.map(ing => `
+              <li class="flex items-center mb-2">
+                ${ing.photo ? `<img src="${ing.photo}" alt="${ing.name}" class="w-10 h-10 object-cover rounded mr-3 flex-shrink-0">` : ''}
+                <div>
+                  <strong>${ing.name}</strong> 
+                  ${ing.quantity ? ` &mdash; Quantity: ${ing.quantity}` : ''}<br>
+                  Calories: ${ing.calories}, Fat: ${ing.fat}g,<br>
+                  Carbs: ${ing.carbohydrates}g, Protein: ${ing.protein}g<br>
+                </div>
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+        <div class="mt-4 p-2 rounded bg-gray-100">
+          <strong>Total Nutrition:</strong>
+          <p>Calories: ${recipe.total_calories || 0}</p>
+          <p>Fat: ${recipe.total_fat || 0}g</p>
+          <p>Carbohydrates: ${recipe.total_carbohydrates || 0}g</p>
+          <p>Protein: ${recipe.total_protein || 0}g</p>
+        </div>
+        
+        <!-- Interaction buttons -->
+        <div class="flex flex-wrap gap-2 mt-4">
+          <!-- Like button -->
+          <button onclick="likeRecipe('${recipe.id}')" id="like-btn-${recipe.id}" class="${recipe.user_liked ? 'bg-green-500 text-white' : 'bg-green-100 text-green-800'} hover:bg-green-200 font-bold py-1 px-3 rounded">
+            👍 <span id="likes-count-${recipe.id}">${recipe.likes}</span>
+          </button>
+          
+          <!-- Dislike button -->
+          <button onclick="dislikeRecipe('${recipe.id}')" id="dislike-btn-${recipe.id}" class="${recipe.user_disliked ? 'bg-red-500 text-white' : 'bg-red-100 text-red-800'} hover:bg-red-200 font-bold py-1 px-3 rounded">
+            👎 <span id="dislikes-count-${recipe.id}">${recipe.dislikes}</span>
+          </button>
+          
+          <!-- Save button -->
+          <button onclick="saveRecipe('${recipe.id}')" id="save-btn-${recipe.id}" class="${recipe.user_saved ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-800'} hover:bg-blue-200 font-bold py-1 px-3 rounded">
+            <span id="save-text-${recipe.id}">
+              ${recipe.user_saved ? '⭐ Saved' : '☆ Save'}
+            </span>
+          </button>
+        </div>
 
-  <!-- JavaScript for modals and dynamic fields -->
-  <script>
+        <!-- Comment section -->
+        <div class="mt-4">
+          <strong>Comments:</strong>
+          <ul class="list-disc ml-6 mt-2 comments-list">
+            ${recipe.comments && recipe.comments.length > 0 
+              ? recipe.comments.map(comment => `
+                <li class="flex items-start mb-1">
+                  ${comment.author_profile_picture 
+                    ? `<img src="${comment.author_profile_picture}" alt="${comment.author_username}" class="w-6 h-6 object-cover rounded-full mr-2 mt-0.5">`
+                    : `<div class="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center mr-2 mt-0.5 text-xs">${comment.author_username.charAt(0).toUpperCase()}</div>`
+                  }
+                  <div>
+                      <a href="/user/{{ comment.author.username }}" class="font-medium hover:underline">{{ comment.author.username }}:</a>
+                    <span>${comment.text}</span>
+                  </div>
+                </li>
+              `).join('')
+              : `<li class="text-gray-500">No comments yet</li>`
+            }
+          </ul>
+
+          <!-- Comment form -->
+          <form id="commentForm-${recipe.id}" onsubmit="submitComment(event, '${recipe.id}')" class="mt-2 flex space-x-2">
+            <input type="hidden" name="csrfmiddlewaretoken" value="${getCsrfToken()}">
+            <input type="text" name="comment" placeholder="Add a comment..." class="flex-grow px-2 py-1 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button type="submit" class="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700">
+              Comment
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  container.innerHTML = html;
+  
+  // Update pagination
+  let paginationHTML = '';
+  if (total_pages > 1) {
+    paginationHTML = `
+      <div class="flex space-x-2">
+        ${current_page > 1 ? `
+          <button onclick="changePage(${current_page - 1})" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+            Previous
+          </button>
+        ` : ''}
+        
+        ${Array.from({length: total_pages}, (_, i) => i + 1).map(i => `
+          <button onclick="changePage(${i})" class="px-4 py-2 ${i === current_page ? 'bg-blue-500 text-white' : 'bg-gray-200'} rounded hover:bg-gray-300">
+            ${i}
+          </button>
+        `).join('')}
+        
+        ${current_page < total_pages ? `
+          <button onclick="changePage(${current_page + 1})" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+            Next
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
+  paginationContainer.innerHTML = paginationHTML;
+}
+
+function changePage(page) {
+  currentFilters.page = page;
+  fetchResults();
+  // Scroll to top of results
+  document.querySelector('.space-y-4').scrollIntoView({ behavior: 'smooth' });
+}
+
     // Get CSRF token from cookies
 function getCsrfToken() {
   const name = 'csrftoken';
@@ -460,10 +918,11 @@ function submitComment(event, recipeId) {
       // Add comment text with username
       const commentDiv = document.createElement('div');
       
-      const usernameSpan = document.createElement('span');
-      usernameSpan.className = 'font-medium';
-      usernameSpan.textContent = data.username + ': ';
-      commentDiv.appendChild(usernameSpan);
+      const usernameLink = document.createElement('a');
+      usernameLink.href = '/user/' + data.username;
+      usernameLink.className = 'font-medium hover:underline';
+      usernameLink.textContent = data.username + ':';
+      commentDiv.appendChild(usernameLink);
       
       const textSpan = document.createElement('span');
       textSpan.textContent = data.comment_text;
@@ -728,53 +1187,77 @@ function submitComment(event, recipeId) {
     }
   }
   }
-  </script>
-  
-  <!-- Delete Confirmation Modal -->
-<div id="deleteConfirmModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
-  <div class="flex min-h-full items-center justify-center p-4">
-    <div class="bg-white w-full max-w-md p-6 rounded shadow-lg relative">
-      <button onclick="closeModal('deleteConfirmModal')" class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
-      <h2 class="text-2xl font-bold mb-4 text-center">Confirm Deletion</h2>
-      <p class="mb-6 text-center">Are you sure you want to delete this recipe? This action cannot be undone.</p>
-      <div class="flex justify-between">
-        <button onclick="closeModal('deleteConfirmModal')" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
-          Cancel
-        </button>
-        <form id="deleteRecipeForm" action="" method="POST" class="inline">
-          {% csrf_token %}
-          <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
-            Delete Recipe
-          </button>
-        </form>
-      </div>
+</script>
+<!-- Delete Confirmation Modal -->
+<div id="deleteConfirmModal"
+     class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md p-6 rounded shadow-lg relative">
+            <button onclick="closeModal('deleteConfirmModal')"
+                    class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
+            <h2 class="text-2xl font-bold mb-4 text-center">Confirm Deletion</h2>
+            <p class="mb-6 text-center">Are you sure you want to delete this recipe? This action cannot be undone.</p>
+            <div class="flex justify-between">
+                <button onclick="closeModal('deleteConfirmModal')"
+                        class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">Cancel</button>
+                <form id="deleteRecipeForm" action="" method="POST" class="inline">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Delete Recipe</button>
+                </form>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
 <!-- Pagination -->
 <div class="mt-8 flex justify-center">
-  {% if total_pages > 1 %}
-    <div class="flex space-x-2">
-      {% if current_page > 1 %}
-        <a href="?page={{ current_page|add:'-1' }}" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
-          Previous
-        </a>
-      {% endif %}
-      
-      {% for i in total_pages|add:'1'|get_range %}
-        {% if i > 0 %}
-          <a href="?page={{ i }}" class="px-4 py-2 {% if i == current_page %}bg-blue-500 text-white{% else %}bg-gray-200{% endif %} rounded hover:bg-gray-300">
-            {{ i }}
-          </a>
-        {% endif %}
-      {% endfor %}
-      
-      {% if current_page < total_pages %}
-        <a href="?page={{ current_page|add:'1' }}" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
-          Next
-        </a>
-      {% endif %}
+    {% if total_pages > 1 %}
+        <div class="flex space-x-2">
+            {% if current_page > 1 %}
+                <a href="?page={{ current_page|add:'-1' }}"
+                   class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Previous</a>
+            {% endif %}
+            {% for i in total_pages|add:'1'|get_range %}
+                {% if i > 0 %}
+                    <a href="?page={{ i }}"
+                       class="px-4 py-2 {% if i == current_page %}bg-blue-500 text-white{% else %}bg-gray-200{% endif %} rounded hover:bg-gray-300">
+                        {{ i }}
+                    </a>
+                {% endif %}
+            {% endfor %}
+            {% if current_page < total_pages %}
+                <a href="?page={{ current_page|add:'1' }}"
+                   class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Next</a>
+            {% endif %}
+        </div>
+    {% endif %}
+</div>
+<!-- Tag Selection Modal -->
+<div id="tagModal"
+     class="fixed inset-0 z-50 hidden overflow-y-auto bg-black bg-opacity-50">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="bg-white w-full max-w-lg p-6 rounded shadow-lg relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeTagModal()"
+                    class="absolute top-2 right-2 text-gray-500 hover:text-gray-700">&times;</button>
+            <h2 class="text-2xl font-bold mb-4">Select Tags</h2>
+            <div class="mb-4">
+                <div class="font-bold mb-2">Selected Tags:</div>
+                <div id="selectedTagsContainer" class="flex flex-wrap gap-2 mb-4">
+                    <!-- Selected tags will appear here -->
+                </div>
+            </div>
+            <div class="mb-4">
+                <div class="font-bold mb-2">Available Tags:</div>
+                <div id="availableTagsContainer"
+                     class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <!-- Available tags will appear here -->
+                </div>
+            </div>
+            <div class="text-right">
+                <button onclick="applyTagFilters()"
+                        class="px-4 py-2 bg-blue-600 text-white rounded">Apply Filters</button>
+            </div>
+        </div>
     </div>
-  {% endif %}
 </div>
 {% endblock %}

@@ -1,5 +1,6 @@
-from django.shortcuts import render, redirect
-from mongoengine.errors import NotUniqueError, DoesNotExist
+from django.shortcuts import redirect, render
+from mongoengine.errors import DoesNotExist, NotUniqueError
+
 
 def home(request):
     if request.method == "POST":
@@ -7,4 +8,4 @@ def home(request):
         message = request.POST.get("message")
         # TODO: send this message somewhere
         return redirect("home")
-    return render(request, 'home.html')
+    return render(request, "home.html")
