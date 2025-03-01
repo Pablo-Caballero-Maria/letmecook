@@ -185,7 +185,7 @@
       {% endfor %}
     </div>
     <!-- Pagination -->
-    <div class="mt-8 flex justify-center">
+    <div id="pagination-container" class="mt-8 flex justify-center">
       {% if total_pages > 1 %}
         <div class="flex space-x-2">
           {% if current_page > 1 %}
@@ -445,10 +445,12 @@
     
     function renderResults(data) {
       const container = document.querySelector('.space-y-4');
+      const paginationContainer = document.getElementById('pagination-container');
       const { recipes, total_pages, current_page } = data;
       
       if (recipes.length === 0) {
         container.innerHTML = '<div class="p-6 text-center"><p class="text-gray-500">No recipes found matching your criteria.</p></div>';
+        paginationContainer.innerHTML = '';
         return;
       }
       
@@ -572,35 +574,36 @@
     </div>
     `;
   });
+
+  container.innerHTML = html;
+  
+  // Update pagination separately
+  let paginationHTML = '';
+  if (total_pages > 1) {
+    paginationHTML = `
+      <div class="flex space-x-2">
+        ${current_page > 1 ? `
+          <button onclick="changePage(${current_page - 1})" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+            Previous
+          </button>
+        ` : ''}
+        
+        ${Array.from({length: total_pages}, (_, i) => i + 1).map(i => `
+          <button onclick="changePage(${i})" class="px-4 py-2 ${i === current_page ? 'bg-blue-500 text-white' : 'bg-gray-200'} rounded hover:bg-gray-300">
+            ${i}
+          </button>
+        `).join('')}
+        
+        ${current_page < total_pages ? `
+          <button onclick="changePage(${current_page + 1})" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+            Next
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
+  paginationContainer.innerHTML = paginationHTML;
       
-      // Add pagination
-      if (total_pages > 1) {
-        html += `
-        <div class="mt-8 flex justify-center">
-          <div class="flex space-x-2">
-            ${current_page > 1 ? `
-              <button onclick="changePage(${current_page - 1})" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
-                Previous
-              </button>
-            ` : ''}
-            
-            ${Array.from({length: total_pages}, (_, i) => i + 1).map(i => `
-              <button onclick="changePage(${i})" class="px-4 py-2 ${i === current_page ? 'bg-blue-500 text-white' : 'bg-gray-200'} rounded hover:bg-gray-300">
-                ${i}
-              </button>
-            `).join('')}
-            
-            ${current_page < total_pages ? `
-              <button onclick="changePage(${current_page + 1})" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
-                Next
-              </button>
-            ` : ''}
-          </div>
-        </div>
-        `;
-      }
-      
-      container.innerHTML = html;
     }
     
     function changePage(page) {

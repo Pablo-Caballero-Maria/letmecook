@@ -13,7 +13,7 @@ def my_recipes_view(request):
     
     # Add pagination
     page = int(request.GET.get('page', 1))
-    per_page = 1  # Same as explore_recipes_view for consistency
+    per_page = 4  # Same as explore_recipes_view for consistency
     
     # Get all recipes for the user
     all_recipes = Recipe.objects(owner=user_id)
@@ -248,7 +248,7 @@ def add_comment_view(request, recipe_id):
 def explore_recipes_view(request):
     user_id = request.session.get('user_id')
     page = int(request.GET.get('page', 1))
-    per_page = 1
+    per_page = 4
     
     if user_id:
         user = User.objects.get(id=user_id)
@@ -417,7 +417,7 @@ def saved_recipes_view(request):
     
     # Add pagination
     page = int(request.GET.get('page', 1))
-    per_page = 1  # Same as explore_recipes_view for consistency
+    per_page = 4  # Same as explore_recipes_view for consistency
     
     user = User.objects.get(id=user_id)
     
@@ -458,7 +458,7 @@ def api_recipes_view(request):
     tags = request.GET.get('tags', '')
     sort_by = request.GET.get('sort', 'newest')
     page = int(request.GET.get('page', 1))
-    per_page = 1
+    per_page = 4
     
     # Build the query
     filters = {}
