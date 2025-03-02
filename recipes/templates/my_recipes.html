@@ -425,7 +425,94 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Load all available tags for the modal
   loadAllTags();
+  clearFormInputsOnReload();
 });
+
+function clearFormInputsOnReload() {
+  // Check if the page was reloaded (not navigated to directly)
+  if (performance.navigation.type === 1) {
+    // Clear search inputs
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = '';
+    
+    // Reset sort dropdown to default
+    const sortDropdown = document.getElementById('sortBy');
+    if (sortDropdown) sortDropdown.value = 'newest';
+    
+    // Reset all forms including comment forms
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+      form.reset();
+    });
+    
+    // Reset URL parameters
+    if (window.location.search) {
+      const url = new URL(window.location);
+      url.search = '';
+      window.history.replaceState({}, '', url);
+    }
+    
+    // Reset filter state
+    currentFilters.query = '';
+    currentFilters.tags = [];
+    currentFilters.sort = 'newest';
+    currentFilters.page = 1;
+    
+    // Clear selected tags UI
+    renderSelectedTagBadges();
+    
+    // Reset temp tags used by the modal
+    tempSelectedTags = [];
+    
+    // Clear create recipe modal
+    const createModal = document.getElementById('createModal');
+    if (createModal) {
+      const form = createModal.querySelector('form');
+      if (form) form.reset();
+      
+      // Clear dynamically added elements
+      const tagsContainer = document.getElementById('newTagsContainer');
+      if (tagsContainer) tagsContainer.innerHTML = '';
+      
+      const ingredientsContainer = document.getElementById('newIngredientsContainer');
+      if (ingredientsContainer) ingredientsContainer.innerHTML = '';
+    }
+    
+    // Clear image previews
+    const previews = document.querySelectorAll('[id^="recipeImagePreview"]');
+    previews.forEach(preview => {
+      // Only keep original images, clear new uploads
+      const originalImg = preview.getAttribute('data-original');
+      if (originalImg) {
+        preview.innerHTML = `<img src="${originalImg}" alt="Original Image" class="h-20 w-auto object-cover rounded">`;
+      } else {
+        preview.innerHTML = '';
+      }
+    });
+    
+    // Clear any validation error messages
+    const errorMessages = document.querySelectorAll('.error-message');
+    errorMessages.forEach(msg => {
+      msg.classList.add('hidden');
+    });
+    
+    // Handle update modals too - clear any unsaved changes
+    const updateModals = document.querySelectorAll('[id^="updateModal-"]');
+    updateModals.forEach(modal => {
+      const modalForm = modal.querySelector('form');
+      if (modalForm) modalForm.reset();
+    });
+    
+    // Clear any comment forms that might be open
+    const commentInputs = document.querySelectorAll('form[id^="commentForm-"] input[name="comment"]');
+    commentInputs.forEach(input => {
+      input.value = '';
+    });
+  }
+}
+
+// Make sure it runs on page load
+document.addEventListener('DOMContentLoaded', clearFormInputsOnReload);
 
 // Debounce function for search
 function debounce(func, delay) {

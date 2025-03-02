@@ -765,5 +765,38 @@ function submitComment(event, recipeId) {
       }
       return cookieValue;
     }
+
+    function clearFormInputsOnReload() {
+  // Check if the page was reloaded (not navigated to directly)
+  if (performance.navigation.type === 1) {
+    // Clear search input
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = '';
+    
+    // Clear comment forms
+    const commentForms = document.querySelectorAll('form[id^="comment-form-"]');
+    commentForms.forEach(form => {
+      form.reset();
+    });
+    
+    // Reset URL parameters
+    if (window.location.search) {
+      const url = new URL(window.location);
+      url.search = '';
+      window.history.replaceState({}, '', url);
+    }
+    
+    // Reset filters
+    currentFilters.query = '';
+    currentFilters.tags = [];
+    currentFilters.page = 1;
+    
+    // Update the UI to match reset state
+    document.getElementById('sortBy').value = 'newest';
+    renderSelectedTagBadges();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', clearFormInputsOnReload);
         </script>
     {% endblock %}

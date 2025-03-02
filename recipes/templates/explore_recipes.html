@@ -265,8 +265,46 @@
       
       // Load all available tags for the modal
       loadAllTags();
+      clearFormInputsOnReload();
     });
     
+    function clearFormInputsOnReload() {
+  // Check if the page was reloaded (not navigated to directly)
+  if (performance.navigation.type === 1) {
+    // Clear search inputs
+    const searchInputs = document.querySelectorAll('input[type="text"], input[type="search"]');
+    searchInputs.forEach(input => {
+      input.value = '';
+    });
+    
+    // Clear forms
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+      form.reset();
+    });
+    
+        // Reset sorting to default "newest"
+        const sortBySelect = document.getElementById('sortBy');
+    if (sortBySelect) {
+      sortBySelect.value = 'newest';
+      currentFilters.sort = 'newest';
+    }
+    
+    // Reset any URL parameters related to search or filters
+    if (window.location.search) {
+      const url = new URL(window.location);
+      url.search = '';
+      window.history.replaceState({}, '', url);
+    }
+    
+    // Reset filter tags
+    currentFilters.tags = [];
+    renderSelectedTagBadges();
+  }
+}
+
+// Make sure this runs on page load
+document.addEventListener('DOMContentLoaded', clearFormInputsOnReload);
     // Debounce function for search
     function debounce(func, delay) {
       let timeout;

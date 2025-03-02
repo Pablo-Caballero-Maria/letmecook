@@ -66,5 +66,17 @@
         reader.readAsDataURL(this.files[0]);
       }
     });
+
+    document.addEventListener('DOMContentLoaded', function() {
+  // Clear form fields and profile picture preview if page was reloaded
+  if (performance.navigation.type === 1) {
+    const form = document.querySelector('form');
+    if (form) form.reset();
+    
+    // Clear profile picture preview
+    const profilePreview = document.getElementById('profilePicPreview');
+    if (profilePreview) profilePreview.innerHTML = '';
+  }
+});
     </script>
 {% endblock %}

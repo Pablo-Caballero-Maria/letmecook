@@ -55,10 +55,19 @@
                                  class="w-16 h-16 object-cover rounded mr-3">
                             <div>
                                 <h2 class="text-xl font-semibold">{{ recipe.title }}</h2>
-                                <p class="text-sm text-gray-500">
-                                    By: <a href="/user/{{ recipe.owner.username }}" class="hover:underline">{{ recipe.owner.username }}</a>
-                                </p>
-                            </div>
+                                <div class="flex items-center text-sm text-gray-500">
+                                  {% if recipe.owner.profile_picture %}
+                                      <img src="{{ recipe.owner.profile_picture }}"
+                                           alt="{{ recipe.owner.username }}"
+                                           class="w-6 h-6 object-cover rounded-full mr-1">
+                                  {% else %}
+                                      <div class="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center mr-1 text-xs">
+                                          {{ recipe.owner.username|make_list|first|upper }}
+                                      </div>
+                                  {% endif %}
+                                  <span>By: <a href="/user/{{ recipe.owner.username }}" class="hover:underline">{{ recipe.owner.username }}</a></span>
+                              </div>
+                          </div>
                         </div>
                         <div>
                             <button class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
@@ -226,6 +235,79 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Load all available tags for the modal
   loadAllTags();
+  clearFormInputsOnReload();
+});
+
+function clearFormInputsOnReload() {
+  // Check if the page was reloaded (not navigated to directly)
+  if (performance.navigation.type === 1) {
+    // Clear search input
+    const searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.value = '';
+    
+    // Reset sort dropdown to default
+    const sortDropdown = document.getElementById('sortBy');
+    if (sortDropdown) sortDropdown.value = 'newest';
+    
+    // Reset all forms including comment forms
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+      form.reset();
+    });
+    
+    // Reset URL parameters
+    if (window.location.search) {
+      const url = new URL(window.location);
+      url.search = '';
+      window.history.replaceState({}, '', url);
+    }
+    
+    // Reset filter state
+    currentFilters.query = '';
+    currentFilters.tags = [];
+    currentFilters.sort = 'newest';
+    currentFilters.page = 1;
+    
+    // Clear selected tags UI
+    renderSelectedTagBadges();
+    
+    // Reset temp tags used by the modal
+    tempSelectedTags = [];
+    
+    // Update sort UI to match reset state
+    if (sortDropdown) sortDropdown.value = 'newest';
+    
+    // Clear any comment forms that might be open
+    const commentInputs = document.querySelectorAll('form[id^="commentForm-"] input[name="comment"]');
+    commentInputs.forEach(input => {
+      input.value = '';
+    });
+  }
+}
+
+// Make sure it runs on page load
+document.addEventListener('DOMContentLoaded', function() {
+  // Initialize filter values from URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('q')) {
+    document.getElementById('searchInput').value = urlParams.get('q');
+    currentFilters.query = urlParams.get('q');
+  }
+  if (urlParams.has('sort')) {
+    currentFilters.sort = urlParams.get('sort');
+    document.getElementById('sortBy').value = currentFilters.sort;
+  }
+  if (urlParams.has('tag')) {
+    const tags = urlParams.get('tag').split(',');
+    currentFilters.tags = tags;
+    renderSelectedTagBadges();
+  }
+  
+  // Setup event listeners
+  // ...existing code...
+  
+  // Check if this was a page reload and clear forms if needed
+  clearFormInputsOnReload();
 });
 
 // Debounce function for search
@@ -382,6 +464,7 @@ function renderResults(data) {
   const paginationContainer = document.querySelector('.mt-8.flex.justify-center');
   const { recipes, total_pages, current_page } = data;
   
+  
   if (recipes.length === 0) {
     container.innerHTML = `
       <div class="p-6 text-center">
@@ -405,8 +488,14 @@ function renderResults(data) {
           ${recipe.photo ? `<img src="${recipe.photo}" alt="${recipe.title}" class="w-16 h-16 object-cover rounded mr-3">` : ''}
           <div>
             <h2 class="text-xl font-semibold">${recipe.title}</h2>
-            <p class="text-sm text-gray-500">By: <a href="/user/{{ recipe.owner.username }}" class="hover:underline">{{ recipe.owner.username }}</a></p>
-            </div>
+                        <div class="flex items-center text-sm text-gray-500">
+              ${recipe.owner_profile_picture 
+                ? `<img src="${recipe.owner_profile_picture}" alt="${recipe.owner_username}" class="w-6 h-6 object-cover rounded-full mr-1">`
+                : `<div class="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center mr-1 text-xs">${recipe.owner_username.charAt(0).toUpperCase()}</div>`
+              }
+                <span>By: <a href="/user/${recipe.owner_username}" class="hover:underline">${recipe.owner_username}</a></span>
+              </div>
+          </div>            
         </div>
         <div>
           <button class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300" onclick="toggleDetails('details-${recipe.id}')">

@@ -99,64 +99,82 @@
     // Scroll to bottom on page load
     scrollToBottom();
     
-    // Send message
-    messageForm.addEventListener('submit', function(event) {
-      event.preventDefault();
+    
+
+    document.addEventListener('DOMContentLoaded', function() {
+  // Existing scroll code...
+  scrollToBottom();
+  
+  // Clear message input if page was reloaded
+  if (performance.navigation.type === 1) {
+    const messageInput = document.getElementById('message-input');
+    if (messageInput) messageInput.value = '';
+  }
+});
+
+messageForm.addEventListener('submit', function(event) {
+  event.preventDefault();
+  
+  const messageInput = document.getElementById('message-input');
+  const message = messageInput.value.trim();
+  if (!message) return;
+  
+  const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+  
+  fetch('/chat/{{ other_user.username }}/send', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'X-CSRFToken': csrfToken,
+      'Accept': 'application/json'
+    },
+    body: 'message=' + encodeURIComponent(message)
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      // Clear input
+      messageInput.value = '';
       
-      const messageInput = document.getElementById('message-input');
-      const message = messageInput.value.trim();
-      if (!message) return;
+      // Remove "No messages yet" placeholder if it exists
+      const noMessagesPlaceholder = messagesContainer.querySelector('.text-center.text-gray-500.pt-20');
+      if (noMessagesPlaceholder) {
+        noMessagesPlaceholder.remove();
+      }
       
-      const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+      // Add message to UI
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'mb-4 ml-auto max-w-xs';
       
-      fetch('/chat/{{ other_user.username }}/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'X-CSRFToken': csrfToken,
-          'Accept': 'application/json'
-        },
-        body: 'message=' + encodeURIComponent(message)
-      })
-      .then(response => response.json())
-      .then(data => {
-        if (data.success) {
-          // Clear input
-          messageInput.value = '';
-          
-          // Add message to UI
-          const messageDiv = document.createElement('div');
-          messageDiv.className = 'mb-4 ml-auto max-w-xs';
-          
-          messageDiv.innerHTML = `
-            <div class="flex items-start justify-end">
-              <div class="bg-blue-500 text-white p-3 rounded-lg shadow-sm">
-                <div class="text-right">
-                  <span class="font-medium">{{ current_user.username }}</span>
-                </div>
-                <p>${data.message.text}</p>
-                <div class="text-xs text-blue-200 mt-1">
-                  Just now
-                </div>
-              </div>
-              
-              {% if current_user.profile_picture %}
-                <img src="{{ current_user.profile_picture }}" alt="{{ current_user.username }}" class="h-8 w-8 object-cover rounded-full ml-2">
-              {% else %}
-                <div class="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 text-xs ml-2">
-                  {{ current_user.username|first|upper }}
-                </div>
-              {% endif %}
+      messageDiv.innerHTML = `
+        <div class="flex items-start justify-end">
+          <div class="bg-blue-500 text-white p-3 rounded-lg shadow-sm">
+            <div class="text-right">
+              <span class="font-medium">{{ current_user.username }}</span>
             </div>
-          `;
+            <p>${data.message.text}</p>
+            <div class="text-xs text-blue-200 mt-1">
+              Just now
+            </div>
+          </div>
           
-          messagesContainer.appendChild(messageDiv);
-          scrollToBottom();
-        }
-      })
-      .catch(error => {
-        console.error('Error:', error);
-      });
-    });
+          {% if current_user.profile_picture %}
+            <img src="{{ current_user.profile_picture }}" alt="{{ current_user.username }}" class="h-8 w-8 object-cover rounded-full ml-2">
+          {% else %}
+            <div class="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 text-xs ml-2">
+              {{ current_user.username|first|upper }}
+            </div>
+          {% endif %}
+        </div>
+      `;
+      
+      messagesContainer.appendChild(messageDiv);
+      scrollToBottom();
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+  });
+});
     </script>
 {% endblock %}

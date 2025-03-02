@@ -65,5 +65,40 @@
         reader.readAsDataURL(this.files[0]);
       }
     });
+
+    document.addEventListener('DOMContentLoaded', function() {
+  clearFormInputsOnReload();
+});
+
+function clearFormInputsOnReload() {
+  if (performance.navigation.type === 1) {
+    const forms = document.querySelectorAll('form');
+    forms.forEach(form => {
+      // Don't reset the username field which should keep its value
+      const usernameField = form.querySelector('input[name="username"]');
+      const username = usernameField ? usernameField.value : '';
+      
+      form.reset();
+      
+      // Restore username value
+      if (usernameField) usernameField.value = username;
+      
+      // Reset any file upload fields
+      const fileInputs = form.querySelectorAll('input[type="file"]');
+      fileInputs.forEach(input => {
+        input.value = '';
+      });
+      
+      // Reset profile preview to current profile image
+      const currentProfilePic = document.getElementById('currentProfilePic');
+      if (currentProfilePic) {
+        const originalSrc = currentProfilePic.getAttribute('data-original');
+        if (originalSrc) currentProfilePic.src = originalSrc;
+      }
+    });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', clearFormInputsOnReload);
     </script>
 {% endblock %}

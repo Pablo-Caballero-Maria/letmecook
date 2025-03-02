@@ -35,4 +35,13 @@
             Don't have an account? <a href="/register" class="text-green-600 hover:underline">Register</a>
         </p>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+          // Clear form fields if page was reloaded
+          if (performance.navigation.type === 1) {
+            const form = document.querySelector('form');
+            if (form) form.reset();
+          }
+        });
+        </script>
 {% endblock %}
