@@ -11,7 +11,7 @@ def current_user(request):
 
     # Get demo user for comment display
     try:
-        demo_user = User.objects.get(username="pablito")
+        demo_user = User.objects.get(username="Pedro Sánchez")
         context["demo_user"] = demo_user
     except DoesNotExist:
         pass

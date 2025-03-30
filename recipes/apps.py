@@ -26,7 +26,7 @@ class RecipesConfig(AppConfig):
         from auth_app.models import User
 
         demo_user = User(
-            username="pablito",
+            username="Pedro Sánchez",
             password_hash="1234",
             profile_picture="/media/default.jpg",
         )
